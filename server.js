@@ -18,35 +18,13 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Хранилище для комнат и заблокированных комнат
+// Хранилище для комнат (только активные подключения)
 const rooms = new Map();
-const blockedRooms = new Map();
-
-// Функция проверки и очистки устаревших блокировок
-function cleanupBlockedRooms() {
-    const now = Date.now();
-    const threeDays = 3 * 24 * 60 * 60 * 1000;
-    
-    for (const [roomId, blockTime] of blockedRooms.entries()) {
-        if (now - blockTime > threeDays) {
-            blockedRooms.delete(roomId);
-            console.log(`Комната ${roomId} разблокирована после 3 дней`);
-        }
-    }
-}
-
-setInterval(cleanupBlockedRooms, 6 * 60 * 60 * 1000);
 
 io.on('connection', (socket) => {
     console.log('Пользователь подключился:', socket.id);
 
     socket.on('join-room', (roomId) => {
-        if (blockedRooms.has(roomId)) {
-            console.log(`Попытка подключения к заблокированной комнате: ${roomId}`);
-            socket.emit('room-blocked');
-            return;
-        }
-
         socket.roomId = roomId;
         socket.join(roomId);
 
@@ -91,26 +69,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('force-hangup', (roomId) => {
-        console.log(`Принудительное завершение звонка в комнате: ${roomId}`);
-        
-        blockedRooms.set(roomId, Date.now());
-        console.log(`Комната ${roomId} заблокирована на 3 дня`);
-        
-        socket.to(roomId).emit('call-force-ended');
-        
-        const room = rooms.get(roomId);
-        if (room) {
-            room.users.forEach(userId => {
-                const userSocket = io.sockets.sockets.get(userId);
-                if (userSocket) {
-                    userSocket.disconnect(true);
-                }
-            });
-            rooms.delete(roomId);
-        }
-    });
-
+    // УБИРАЕМ force-hangup и блокировку комнат
     socket.on('disconnect', () => {
         console.log('Пользователь отключился:', socket.id);
 
@@ -122,7 +81,7 @@ io.on('connection', (socket) => {
 
                 if (room.users.length === 0) {
                     rooms.delete(socket.roomId);
-                    console.log(`Комната ${socket.roomId} удалена`);
+                    console.log(`Комната ${socket.roomId} удалена (пустая)`);
                 } else {
                     socket.to(socket.roomId).emit('user-left', { userId: socket.id });
                 }
