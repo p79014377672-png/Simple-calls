@@ -7,7 +7,7 @@ let peerConnection = null;
 let socket = null;
 let roomId = null;
 
-// Конфигурация STUN-серверов (необходимы для установления P2P-соединения)
+// Конфигурация STUN-серверов
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -40,7 +40,7 @@ async function init() {
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
-        alert('Ошибка при запуске приложения: ' + error.message);
+        showError('Ошибка при запуске приложения');
     }
 }
 
@@ -59,7 +59,7 @@ async function startLocalVideo() {
         document.getElementById('localVideo').srcObject = localStream;
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
-        alert('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
+        showError('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
     }
 }
 
@@ -98,22 +98,11 @@ function setupSocketEvents() {
         }
     });
 
-    // 6. Пользователь вышел из комнаты
+    // 6. Пользователь вышел из комнаты (УПРОЩАЕМ)
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        hangUp();
-    });
-
-    // 7. Комната заблокирована
-    socket.on('room-blocked', () => {
-        console.log('Комната заблокирована');
-        showError('Эта ссылка больше не действительна. Пожалуйста, создайте новый звонок.');
-    });
-
-    // 8. Принудительное завершение звонка
-    socket.on('call-force-ended', () => {
-        console.log('Звонок принудительно завершен');
-        forceHangup();
+        // Просто завершаем звонок без блокировки
+        simpleHangup();
     });
 }
 
@@ -196,8 +185,10 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// Принудительное завершение звонка
-function forceHangup() {
+// Простое завершение звонка (БЕЗ блокировки)
+function simpleHangup() {
+    console.log('Завершение звонка');
+    
     // Останавливаем все медиапотоки
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -212,30 +203,31 @@ function forceHangup() {
         peerConnection = null;
     }
 
-    // Отключаемся от сокета
-    if (socket) {
-        socket.disconnect();
-    }
-
     // Очищаем видео элементы
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('remoteVideo').srcObject = null;
 
-    // Показываем черный экран
-    document.body.innerHTML = '<div style="width:100%; height:100%; background-color:black;"></div>';
-    
-    console.log('Звонок принудительно завершен');
+    // Показываем сообщение о завершении
+    document.body.innerHTML = `
+        <div style="width:100%; height:100%; background-color:black; color:white; 
+                   display:flex; justify-content:center; align-items:center; 
+                   font-family:sans-serif; text-align:center; padding:20px;">
+            <div>
+                <h2>Звонок завершен</h2>
+                <button onclick="window.location.reload()" 
+                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
+                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
+                    Начать новый звонок
+                </button>
+            </div>
+        </div>
+    `;
 }
 
-// Завершение звонка с блокировкой комнаты
+// Завершение звонка
 function hangUp() {
-    // Сообщаем серверу о принудительном завершении
-    if (socket && roomId) {
-        socket.emit('force-hangup', roomId);
-    }
-    
-    // Локально завершаем звонок
-    forceHangup();
+    // Только локальное завершение, без сообщения серверу о блокировке
+    simpleHangup();
 }
 
 // Переключение аудио
