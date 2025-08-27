@@ -154,7 +154,6 @@ function setupSocketEvents() {
     // 6. Пользователь вышел из комнаты
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        // Мягкое завершение вместо forceHangup
         if (peerConnection || remoteStream) {
             hangUp();
         }
@@ -189,7 +188,7 @@ function createPeerConnection(targetUserId) {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
-        isTryingToReconnect = false; // Успешно переподключились
+        isTryingToReconnect = false;
     };
 
     // Генерация ICE-кандидатов
@@ -265,11 +264,15 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// Принудительное завершение звонка (БЕЗ полной очистки страницы)
+// Принудительное завершение звонка
 function forceHangup() {
+    if (!peerConnection && !remoteStream) {
+        console.log('Звонок уже завершен');
+        return;
+    }
+    
     console.log('Force hangup called');
     
-    // Останавливаем все медиапотоки
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
@@ -277,17 +280,14 @@ function forceHangup() {
         remoteStream.getTracks().forEach(track => track.stop());
     }
 
-    // Закрываем PeerConnection
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
     }
 
-    // Очищаем видео элементы
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('remoteVideo').srcObject = null;
 
-    // Показываем сообщение о завершении
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
                    display:flex; justify-content:center; align-items:center; 
@@ -309,18 +309,15 @@ function forceHangup() {
 
 // Завершение звонка с блокировкой комнаты
 function hangUp() {
-    // Проверяем, не завершили ли мы уже звонок
     if (!peerConnection && !remoteStream) {
         console.log('Звонок уже завершен');
         return;
     }
     
-    // Сообщаем серверу о принудительном завершении
     if (socket && roomId) {
         socket.emit('force-hangup', roomId);
     }
     
-    // Локально завершаем звонок
     forceHangup();
 }
 
