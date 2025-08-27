@@ -6,9 +6,8 @@ let isVideoOff = false;
 let peerConnection = null;
 let socket = null;
 let roomId = null;
-let isTryingToReconnect = false;
 
-// Конфигурация STUN-серверов
+// Конфигурация STUN-серверов (необходимы для установления P2P-соединения)
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -36,64 +35,12 @@ async function init() {
         // Настраиваем обработчики событий Socket.io
         setupSocketEvents();
         
-        // Настраиваем обработчики переподключения
-        setupReconnectionHandlers();
-        
         // Присоединяемся к комнате
         socket.emit('join-room', roomId);
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
-        showError('Ошибка при запуске приложения');
-    }
-}
-
-// Настройка обработчиков переподключения
-function setupReconnectionHandlers() {
-    // Обработчики событий видимости страницы
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && (peerConnection || remoteStream)) {
-            // Пользователь вернулся на вкладку - пытаемся восстановить соединение
-            tryReconnect();
-        }
-    });
-
-    // Обработка восстановления соединения Socket.io
-    socket.on('reconnect', () => {
-        console.log('Socket reconnected');
-        tryReconnect();
-    });
-
-    socket.on('reconnect_error', () => {
-        console.log('Socket reconnect failed');
-        isTryingToReconnect = false;
-    });
-
-    socket.on('reconnect_failed', () => {
-        console.log('Socket reconnect completely failed');
-        isTryingToReconnect = false;
-    });
-}
-
-// Функция для попытки переподключения
-function tryReconnect() {
-    if (isTryingToReconnect) return;
-    
-    isTryingToReconnect = true;
-    console.log('Attempting to reconnect...');
-    
-    // Проверяем, была ли активная комната
-    const lastRoomId = window.location.hash.substring(1);
-    if (lastRoomId) {
-        // Пытаемся переподключиться к той же комнате
-        socket.emit('join-room', lastRoomId);
-        
-        // Даем 5 секунд на переподключение
-        setTimeout(() => {
-            isTryingToReconnect = false;
-        }, 5000);
-    } else {
-        isTryingToReconnect = false;
+        alert('Ошибка при запуске приложения: ' + error.message);
     }
 }
 
@@ -112,7 +59,7 @@ async function startLocalVideo() {
         document.getElementById('localVideo').srcObject = localStream;
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
-        showError('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
+        alert('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
     }
 }
 
@@ -154,9 +101,7 @@ function setupSocketEvents() {
     // 6. Пользователь вышел из комнаты
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        if (peerConnection || remoteStream) {
-            hangUp();
-        }
+        hangUp();
     });
 
     // 7. Комната заблокирована
@@ -168,9 +113,7 @@ function setupSocketEvents() {
     // 8. Принудительное завершение звонка
     socket.on('call-force-ended', () => {
         console.log('Звонок принудительно завершен');
-        if (peerConnection || remoteStream) {
-            forceHangup();
-        }
+        forceHangup();
     });
 }
 
@@ -188,7 +131,6 @@ function createPeerConnection(targetUserId) {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
-        isTryingToReconnect = false;
     };
 
     // Генерация ICE-кандидатов
@@ -199,16 +141,6 @@ function createPeerConnection(targetUserId) {
                 targetUserId: targetUserId,
                 candidate: event.candidate
             });
-        }
-    };
-
-    // Обработчик разрыва соединения
-    peerConnection.onconnectionstatechange = () => {
-        console.log('Connection state:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'disconnected' || 
-            peerConnection.connectionState === 'failed') {
-            console.log('Connection lost, trying to reconnect...');
-            tryReconnect();
         }
     };
 
@@ -266,13 +198,7 @@ async function setRemoteAnswer(answer) {
 
 // Принудительное завершение звонка
 function forceHangup() {
-    if (!peerConnection && !remoteStream) {
-        console.log('Звонок уже завершен');
-        return;
-    }
-    
-    console.log('Force hangup called');
-    
+    // Останавливаем все медиапотоки
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
@@ -280,44 +206,35 @@ function forceHangup() {
         remoteStream.getTracks().forEach(track => track.stop());
     }
 
+    // Закрываем PeerConnection
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
     }
 
+    // Отключаемся от сокета
+    if (socket) {
+        socket.disconnect();
+    }
+
+    // Очищаем видео элементы
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('remoteVideo').srcObject = null;
 
-    document.body.innerHTML = `
-        <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; justify-content:center; align-items:center; 
-                   font-family:sans-serif; text-align:center; padding:20px;">
-            <div>
-                <h2>Звонок завершен</h2>
-                <p>Соединение было разорвано.</p>
-                <button onclick="window.location.reload()" 
-                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
-                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
-                    Начать новый звонок
-                </button>
-            </div>
-        </div>
-    `;
+    // Показываем черный экран
+    document.body.innerHTML = '<div style="width:100%; height:100%; background-color:black;"></div>';
     
     console.log('Звонок принудительно завершен');
 }
 
 // Завершение звонка с блокировкой комнаты
 function hangUp() {
-    if (!peerConnection && !remoteStream) {
-        console.log('Звонок уже завершен');
-        return;
-    }
-    
+    // Сообщаем серверу о принудительном завершении
     if (socket && roomId) {
         socket.emit('force-hangup', roomId);
     }
     
+    // Локально завершаем звонок
     forceHangup();
 }
 
