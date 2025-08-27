@@ -30,20 +30,20 @@ html, body {
     object-fit: cover;
 }
 
-/* Наше видео (маленькое, в углу) */
+/* Наше видео (маленькое, в углу) - ИСПРАВЛЕННАЯ ВЕРСИЯ */
 #localVideo {
     position: absolute;
-    bottom: 100px;
+    bottom: 100px; /* Выше кнопок управления */
     right: 20px;
-    width: 25%;
+    width: 30vw; /* Ширина 30% от ширины экрана */
     max-width: 150px;
-    height: auto;
-    aspect-ratio: 4/3;
+    height: 22vh; /* Высота 22% от высоты экрана */
+    max-height: 180px;
     border: 2px solid white;
     border-radius: 10px;
     z-index: 10;
-    transform: scaleX(-1);
-    object-fit: cover;
+    transform: scaleX(-1); /* Зеркальное отображение */
+    object-fit: cover; /* Важно: обрезает чтобы заполнить контейнер */
 }
 
 /* Панель управления кнопками */
@@ -54,7 +54,7 @@ html, body {
     width: 100%;
     display: flex;
     justify-content: center;
-    gap: 15px; /* Уменьшаем gap чтобы 4 кнопки поместились */
+    gap: 15px;
     z-index: 20;
 }
 
