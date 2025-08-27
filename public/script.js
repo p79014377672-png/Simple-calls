@@ -154,7 +154,10 @@ function setupSocketEvents() {
     // 6. Пользователь вышел из комнаты
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        forceHangup();
+        // Мягкое завершение вместо forceHangup
+        if (peerConnection || remoteStream) {
+            hangUp();
+        }
     });
 
     // 7. Комната заблокирована
@@ -166,7 +169,9 @@ function setupSocketEvents() {
     // 8. Принудительное завершение звонка
     socket.on('call-force-ended', () => {
         console.log('Звонок принудительно завершен');
-        forceHangup();
+        if (peerConnection || remoteStream) {
+            forceHangup();
+        }
     });
 }
 
@@ -260,8 +265,10 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// Принудительное завершение звонка
+// Принудительное завершение звонка (БЕЗ полной очистки страницы)
 function forceHangup() {
+    console.log('Force hangup called');
+    
     // Останавливаем все медиапотоки
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -276,23 +283,38 @@ function forceHangup() {
         peerConnection = null;
     }
 
-    // Отключаемся от сокета
-    if (socket) {
-        socket.disconnect();
-    }
-
     // Очищаем видео элементы
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('remoteVideo').srcObject = null;
 
-    // Показываем черный экран
-    document.body.innerHTML = '<div style="width:100%; height:100%; background-color:black;"></div>';
+    // Показываем сообщение о завершении
+    document.body.innerHTML = `
+        <div style="width:100%; height:100%; background-color:black; color:white; 
+                   display:flex; justify-content:center; align-items:center; 
+                   font-family:sans-serif; text-align:center; padding:20px;">
+            <div>
+                <h2>Звонок завершен</h2>
+                <p>Соединение было разорвано.</p>
+                <button onclick="window.location.reload()" 
+                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
+                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
+                    Начать новый звонок
+                </button>
+            </div>
+        </div>
+    `;
     
     console.log('Звонок принудительно завершен');
 }
 
 // Завершение звонка с блокировкой комнаты
 function hangUp() {
+    // Проверяем, не завершили ли мы уже звонок
+    if (!peerConnection && !remoteStream) {
+        console.log('Звонок уже завершен');
+        return;
+    }
+    
     // Сообщаем серверу о принудительном завершении
     if (socket && roomId) {
         socket.emit('force-hangup', roomId);
