@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простая видео-звонилка</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Основной контейнер для видео -->
+    <div class="video-container">
+        <!-- Видео собеседника (удаленное, на весь экран) -->
+        <video id="remoteVideo" autoplay playsinline></video>
+
+        <!-- Наше видео (локальное, маленькое, поверх основного) -->
+        <video id="localVideo" autoplay muted playsinline></video>
+
+        <!-- Панель управления кнопками внизу экрана -->
+        <div class="controls">
+            <button id="hangupButton" onclick="hangUp()" class="control-button hangup">📞</button>
+            <button id="toggleAudioButton" onclick="toggleAudio()" class="control-button">🎤</button>
+            <button id="toggleVideoButton" onclick="toggleVideo()" class="control-button">🎥</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+/* Убираем все отступы у body и html */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: sans-serif;
+    background-color: #000;
+    color: white;
+    overflow: hidden;
+}
+
+/* Основной контейнер видео - РАСТЯГИВАЕМ НА ВЕСЬ ЭКРАН */
+.video-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+}
+
+/* Видео собеседника (на ВЕСЬ ЭКРАН) */
+#remoteVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Важно: обрезает видео чтобы заполнить весь экран */
+}
+
+/* Наше видео (маленькое, в углу) */
+#localVideo {
+    position: absolute;
+    bottom: 100px; /* Выше кнопок управления */
+    right: 20px;
+    width: 25%; /* Ширина 1/4 экрана */
+    max-width: 150px;
+    height: auto;
+    aspect-ratio: 4/3;
+    border: 2px solid white;
+    border-radius: 10px;
+    z-index: 10;
+    transform: scaleX(-1); /* Зеркальное отображение для естественного вида */
+    object-fit: cover; /* Чтобы наше видео тоже заполняло свой контейнер */
+}
+
+/* Панель управления кнопками */
+.controls {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    z-index: 20;
+}
+
+.control-button {
+    width: 60px;
+    height: 60px;
+    border: none;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 1.5em;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(5px);
+}
+
+.control-button.hangup {
+    background-color: #f44336; /* Красный для кнопки завершения */
+}
+
+.control-button:active {
+    transform: scale(0.95);
+}
