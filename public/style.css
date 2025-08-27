@@ -27,23 +27,23 @@ html, body {
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Важно: обрезает видео чтобы заполнить весь экран */
+    object-fit: cover;
 }
 
 /* Наше видео (маленькое, в углу) */
 #localVideo {
     position: absolute;
-    bottom: 100px; /* Выше кнопок управления */
+    bottom: 100px;
     right: 20px;
-    width: 25%; /* Ширина 1/4 экрана */
+    width: 25%;
     max-width: 150px;
     height: auto;
     aspect-ratio: 4/3;
     border: 2px solid white;
     border-radius: 10px;
     z-index: 10;
-    transform: scaleX(-1); /* Зеркальное отображение для естественного вида */
-    object-fit: cover; /* Чтобы наше видео тоже заполняло свой контейнер */
+    transform: scaleX(-1);
+    object-fit: cover;
 }
 
 /* Панель управления кнопками */
@@ -54,18 +54,18 @@ html, body {
     width: 100%;
     display: flex;
     justify-content: center;
-    gap: 20px;
+    gap: 15px; /* Уменьшаем gap чтобы 4 кнопки поместились */
     z-index: 20;
 }
 
 .control-button {
-    width: 60px;
-    height: 60px;
+    width: 55px;
+    height: 55px;
     border: none;
     border-radius: 50%;
     background-color: rgba(255, 255, 255, 0.2);
     color: white;
-    font-size: 1.5em;
+    font-size: 1.4em;
     cursor: pointer;
     display: flex;
     justify-content: center;
@@ -74,7 +74,7 @@ html, body {
 }
 
 .control-button.hangup {
-    background-color: #f44336; /* Красный для кнопки завершения */
+    background-color: #f44336;
 }
 
 .control-button:active {

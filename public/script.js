@@ -6,6 +6,8 @@ let isVideoOff = false;
 let peerConnection = null;
 let socket = null;
 let roomId = null;
+let currentFacingMode = 'user'; // 'user' (фронтальная) или 'environment' (задняя)
+let videoTrack = null;
 
 // Конфигурация STUN-серверов
 const configuration = {
@@ -53,13 +55,72 @@ function generateRoomId() {
 async function startLocalVideo() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ 
-            video: true, 
+            video: { facingMode: 'user' }, // начинаем с фронтальной камеры
             audio: true 
         });
+        
+        // Сохраняем видео-трек для дальнейшего использования
+        videoTrack = localStream.getVideoTracks()[0];
         document.getElementById('localVideo').srcObject = localStream;
+        
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
         showError('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
+    }
+}
+
+// НОВАЯ ФУНКЦИЯ: Переключение между камерами
+async function switchCamera() {
+    try {
+        console.log('Переключение камеры...');
+        
+        // Останавливаем текущий видео-трек
+        if (videoTrack) {
+            videoTrack.stop();
+        }
+        
+        // Определяем какую камеру включить (переключаем)
+        const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        currentFacingMode = newFacingMode;
+        
+        // Получаем новое медиа с выбранной камерой
+        const newStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: newFacingMode },
+            audio: true 
+        });
+        
+        // Получаем новый видео-трек
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        
+        // Заменяем видео-трек в существующем stream
+        if (localStream) {
+            const oldVideoTrack = localStream.getVideoTracks()[0];
+            localStream.removeTrack(oldVideoTrack);
+            localStream.addTrack(newVideoTrack);
+            videoTrack = newVideoTrack;
+        }
+        
+        // Обновляем отображение
+        document.getElementById('localVideo').srcObject = localStream;
+        
+        // Если есть активное соединение, заменяем трек
+        if (peerConnection) {
+            const sender = peerConnection.getSenders().find(s => 
+                s.track && s.track.kind === 'video'
+            );
+            if (sender) {
+                await sender.replaceTrack(newVideoTrack);
+            }
+        }
+        
+        // Останавливаем ненужные аудио-треки из нового stream
+        newStream.getAudioTracks().forEach(track => track.stop());
+        
+        console.log('Камера переключена на:', newFacingMode);
+        
+    } catch (error) {
+        console.error('Ошибка при переключении камеры:', error);
+        alert('Не удалось переключить камеру. Возможно, эта функция не поддерживается вашим устройством.');
     }
 }
 
@@ -98,10 +159,9 @@ function setupSocketEvents() {
         }
     });
 
-    // 6. Пользователь вышел из комнаты (УПРОЩАЕМ)
+    // 6. Пользователь вышел из комнаты
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        // Просто завершаем звонок без блокировки
         simpleHangup();
     });
 }
@@ -185,7 +245,7 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// Простое завершение звонка (БЕЗ блокировки)
+// Простое завершение звонка
 function simpleHangup() {
     console.log('Завершение звонка');
     
@@ -195,6 +255,11 @@ function simpleHangup() {
     }
     if (remoteStream) {
         remoteStream.getTracks().forEach(track => track.stop());
+    }
+    
+    // Останавливаем отдельно видео-трек
+    if (videoTrack) {
+        videoTrack.stop();
     }
 
     // Закрываем PeerConnection
@@ -226,7 +291,6 @@ function simpleHangup() {
 
 // Завершение звонка
 function hangUp() {
-    // Только локальное завершение, без сообщения серверу о блокировке
     simpleHangup();
 }
 
