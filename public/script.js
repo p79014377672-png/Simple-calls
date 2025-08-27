@@ -6,6 +6,7 @@ let isVideoOff = false;
 let peerConnection = null;
 let socket = null;
 let roomId = null;
+let isTryingToReconnect = false;
 
 // Конфигурация STUN-серверов
 const configuration = {
@@ -35,12 +36,64 @@ async function init() {
         // Настраиваем обработчики событий Socket.io
         setupSocketEvents();
         
+        // Настраиваем обработчики переподключения
+        setupReconnectionHandlers();
+        
         // Присоединяемся к комнате
         socket.emit('join-room', roomId);
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError('Ошибка при запуске приложения');
+    }
+}
+
+// Настройка обработчиков переподключения
+function setupReconnectionHandlers() {
+    // Обработчики событий видимости страницы
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && (peerConnection || remoteStream)) {
+            // Пользователь вернулся на вкладку - пытаемся восстановить соединение
+            tryReconnect();
+        }
+    });
+
+    // Обработка восстановления соединения Socket.io
+    socket.on('reconnect', () => {
+        console.log('Socket reconnected');
+        tryReconnect();
+    });
+
+    socket.on('reconnect_error', () => {
+        console.log('Socket reconnect failed');
+        isTryingToReconnect = false;
+    });
+
+    socket.on('reconnect_failed', () => {
+        console.log('Socket reconnect completely failed');
+        isTryingToReconnect = false;
+    });
+}
+
+// Функция для попытки переподключения
+function tryReconnect() {
+    if (isTryingToReconnect) return;
+    
+    isTryingToReconnect = true;
+    console.log('Attempting to reconnect...');
+    
+    // Проверяем, была ли активная комната
+    const lastRoomId = window.location.hash.substring(1);
+    if (lastRoomId) {
+        // Пытаемся переподключиться к той же комнате
+        socket.emit('join-room', lastRoomId);
+        
+        // Даем 5 секунд на переподключение
+        setTimeout(() => {
+            isTryingToReconnect = false;
+        }, 5000);
+    } else {
+        isTryingToReconnect = false;
     }
 }
 
@@ -59,7 +112,7 @@ async function startLocalVideo() {
         document.getElementById('localVideo').srcObject = localStream;
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
-        showError('Не удалось получить доступ к камере и микрофону');
+        showError('Не удалось получить доступ к камере и микрофону. Разрешите доступ и перезагрузите страницу.');
     }
 }
 
@@ -131,6 +184,7 @@ function createPeerConnection(targetUserId) {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
+        isTryingToReconnect = false; // Успешно переподключились
     };
 
     // Генерация ICE-кандидатов
@@ -141,6 +195,16 @@ function createPeerConnection(targetUserId) {
                 targetUserId: targetUserId,
                 candidate: event.candidate
             });
+        }
+    };
+
+    // Обработчик разрыва соединения
+    peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'disconnected' || 
+            peerConnection.connectionState === 'failed') {
+            console.log('Connection lost, trying to reconnect...');
+            tryReconnect();
         }
     };
 
@@ -196,7 +260,7 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// Принудительное завершение звонка (с блокировкой комнаты)
+// Принудительное завершение звонка
 function forceHangup() {
     // Останавливаем все медиапотоки
     if (localStream) {
@@ -225,13 +289,6 @@ function forceHangup() {
     document.body.innerHTML = '<div style="width:100%; height:100%; background-color:black;"></div>';
     
     console.log('Звонок принудительно завершен');
-
-    // Через 2 секунды предлагаем закрыть вкладку
-    setTimeout(() => {
-        if (confirm('Звонок завершен. Закрыть вкладку?')) {
-            window.close();
-        }
-    }, 2000);
 }
 
 // Завершение звонка с блокировкой комнаты
