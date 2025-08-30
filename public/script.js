@@ -12,6 +12,10 @@ let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 50;
 
+// Защита от множественных нажатий
+let isProcessingAudio = false;
+let isProcessingVideo = false;
+
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -352,37 +356,83 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-function toggleAudio() {
-    if (localStream) {
-        const audioTracks = localStream.getAudioTracks();
-        if (audioTracks.length > 0) {
-            isAudioMuted = !isAudioMuted;
-            audioTracks[0].enabled = !isAudioMuted;
-            document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
-            
-            sendStatusToPeer();
-            
-            if (isAudioMuted) {
-                showStatusNotification('Вы отключили микрофон', 'audio-muted');
+// УЛУЧШЕННАЯ функция переключения аудио
+async function toggleAudio() {
+    if (isProcessingAudio) return;
+    
+    isProcessingAudio = true;
+    console.log('Переключение аудио...');
+    
+    try {
+        if (localStream) {
+            const audioTracks = localStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                isAudioMuted = !isAudioMuted;
+                audioTracks[0].enabled = !isAudioMuted;
+                
+                const button = document.getElementById('toggleAudioButton');
+                button.textContent = isAudioMuted ? '🎤❌' : '🎤';
+                
+                button.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                }, 150);
+                
+                sendStatusToPeer();
+                
+                if (isAudioMuted) {
+                    showStatusNotification('Вы отключили микрофон', 'audio-muted');
+                } else {
+                    showStatusNotification('Вы включили микрофон', 'audio-muted');
+                }
             }
         }
+    } catch (error) {
+        console.error('Ошибка переключения аудио:', error);
+    } finally {
+        setTimeout(() => {
+            isProcessingAudio = false;
+        }, 300);
     }
 }
 
-function toggleVideo() {
-    if (localStream) {
-        const videoTracks = localStream.getVideoTracks();
-        if (videoTracks.length > 0) {
-            isVideoOff = !isVideoOff;
-            videoTracks[0].enabled = !isVideoOff;
-            document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
-            
-            sendStatusToPeer();
-            
-            if (isVideoOff) {
-                showStatusNotification('Вы отключили камеру', 'video-off');
+// УЛУЧШЕННАЯ функция переключения видео
+async function toggleVideo() {
+    if (isProcessingVideo) return;
+    
+    isProcessingVideo = true;
+    console.log('Переключение видео...');
+    
+    try {
+        if (localStream) {
+            const videoTracks = localStream.getVideoTracks();
+            if (videoTracks.length > 0) {
+                isVideoOff = !isVideoOff;
+                videoTracks[0].enabled = !isVideoOff;
+                
+                const button = document.getElementById('toggleVideoButton');
+                button.textContent = isVideoOff ? '🎥❌' : '🎥';
+                
+                button.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                }, 150);
+                
+                sendStatusToPeer();
+                
+                if (isVideoOff) {
+                    showStatusNotification('Вы отключили камеру', 'video-off');
+                } else {
+                    showStatusNotification('Вы включили камеру', 'video-off');
+                }
             }
         }
+    } catch (error) {
+        console.error('Ошибка переключения видео:', error);
+    } finally {
+        setTimeout(() => {
+            isProcessingVideo = false;
+        }, 300);
     }
 }
 
