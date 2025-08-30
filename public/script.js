@@ -66,7 +66,7 @@ async function startLocalVideo() {
         videoTrack = localStream.getVideoTracks()[0];
         document.getElementById('localVideo').srcObject = localStream;
     } catch (error) {
-        console.error('Ошибка доступа к камере/микрофону:', error);
+        console.error('Ошибка доaccess к камере/микрофону:', error);
         showError('Не удалось получить доступ к камере и микрофону');
     }
 }
@@ -245,15 +245,32 @@ function setupSocketEvents() {
         }
     });
     
+    // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СТАТУСОВ
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
+        // СИНХРОНИЗИРУЕМ локальное состояние с состоянием собеседника
+        if (data.hasOwnProperty('audioMuted')) {
+            isAudioMuted = data.audioMuted;
+            document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
+        }
+        
+        if (data.hasOwnProperty('videoOff')) {
+            isVideoOff = data.videoOff;
+            document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
+        }
+        
+        // Показываем уведомления
         if (data.audioMuted) {
             showStatusNotification('Собеседник отключил микрофон', 'audio-muted');
+        } else if (data.hasOwnProperty('audioMuted')) {
+            showStatusNotification('Собеседник включил микрофон', 'audio-muted');
         }
         
         if (data.videoOff) {
             showStatusNotification('Собеседник отключил камеру', 'video-off');
+        } else if (data.hasOwnProperty('videoOff')) {
+            showStatusNotification('Собеседник включил камеру', 'video-off');
         }
     });
     
@@ -356,7 +373,6 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// УЛУЧШЕННАЯ функция переключения аудио
 async function toggleAudio() {
     if (isProcessingAudio) return;
     
@@ -396,7 +412,6 @@ async function toggleAudio() {
     }
 }
 
-// УЛУЧШЕННАЯ функция переключения видео
 async function toggleVideo() {
     if (isProcessingVideo) return;
     
