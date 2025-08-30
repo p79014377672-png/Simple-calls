@@ -18,16 +18,13 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Хранилище для комнат (только активные подключения)
 const rooms = new Map();
 
 io.on('connection', (socket) => {
     console.log('Пользователь подключился:', socket.id);
 
-    // Обработчик статусов пользователя (аудио/видео)
     socket.on('user-status', (data) => {
         console.log(`Статус от ${socket.id}:`, data);
-        // Пересылаем статус всем в комнате, кроме отправителя
         if (socket.roomId) {
             socket.to(socket.roomId).emit('user-status', data);
         }

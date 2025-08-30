@@ -12,7 +12,6 @@ let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 50;
 
-// УЛУЧШЕННАЯ конфигурация STUN-серверов
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -27,7 +26,6 @@ const configuration = {
     iceTransportPolicy: 'all'
 };
 
-// Инициализация при загрузке страницы
 async function init() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -43,7 +41,6 @@ async function init() {
         setupSocketEvents();
         socket.emit('join-room', roomId);
         
-        // Запускаем периодическую проверку интерфейса
         setInterval(checkAndRestoreInterface, 1000);
         
     } catch (error) {
@@ -101,7 +98,6 @@ async function switchCamera() {
     }
 }
 
-// НОВАЯ ФУНКЦИЯ: Показать уведомление о статусе
 function showStatusNotification(message, type) {
     const notifications = document.getElementById('statusNotifications');
     const notification = document.createElement('div');
@@ -110,7 +106,6 @@ function showStatusNotification(message, type) {
     
     notifications.appendChild(notification);
     
-    // Автоматически скрываем через 5 секунд
     setTimeout(() => {
         if (notification.parentNode) {
             notification.parentNode.removeChild(notification);
@@ -118,7 +113,6 @@ function showStatusNotification(message, type) {
     }, 5000);
 }
 
-// НОВАЯ ФУНКЦИЯ: Отправить статус аудио/видео собеседнику
 function sendStatusToPeer() {
     if (socket && roomId) {
         socket.emit('user-status', {
@@ -128,7 +122,6 @@ function sendStatusToPeer() {
     }
 }
 
-// НОВАЯ ФУНКЦИЯ: Проверка и восстановление интерфейса
 function checkAndRestoreInterface() {
     if (remoteStream && document.querySelector('.video-container') === null) {
         console.log('Восстанавливаем интерфейс после подключения...');
@@ -136,7 +129,6 @@ function checkAndRestoreInterface() {
     }
 }
 
-// НОВАЯ ФУНКЦИЯ: Автоматическое переподключение
 function tryReconnect() {
     if (isReconnecting) return;
     
@@ -163,7 +155,6 @@ function tryReconnect() {
     }, 2000);
 }
 
-// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении
 function showReconnectingMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
@@ -177,7 +168,6 @@ function showReconnectingMessage() {
     `;
 }
 
-// НОВАЯ ФУНКЦИЯ: Показать сообщение о необходимости перезагрузки
 function showReloadMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
@@ -196,7 +186,6 @@ function showReloadMessage() {
     `;
 }
 
-// НОВАЯ ФУНКЦИЯ: Восстановление нормального интерфейса
 function restoreInterface() {
     document.body.innerHTML = `
         <div class="video-container">
@@ -217,7 +206,6 @@ function restoreInterface() {
         document.getElementById('remoteVideo').srcObject = remoteStream;
     }
     
-    // Перепривязываем обработчики событий
     document.getElementById('toggleAudioButton').onclick = toggleAudio;
     document.getElementById('toggleVideoButton').onclick = toggleVideo;
     document.getElementById('localVideo').onclick = switchCamera;
@@ -253,7 +241,6 @@ function setupSocketEvents() {
         }
     });
     
-    // НОВЫЙ ОБРАБОТЧИК: Получение статуса от собеседника
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
@@ -373,10 +360,8 @@ function toggleAudio() {
             audioTracks[0].enabled = !isAudioMuted;
             document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
             
-            // Отправляем статус собеседнику
             sendStatusToPeer();
             
-            // Показываем уведомление себе
             if (isAudioMuted) {
                 showStatusNotification('Вы отключили микрофон', 'audio-muted');
             }
@@ -392,10 +377,8 @@ function toggleVideo() {
             videoTracks[0].enabled = !isVideoOff;
             document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
             
-            // Отправляем статус собеседнику
             sendStatusToPeer();
             
-            // Показываем уведомление себе
             if (isVideoOff) {
                 showStatusNotification('Вы отключили камеру', 'video-off');
             }
