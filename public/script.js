@@ -100,12 +100,7 @@ async function switchCamera() {
 
 // НОВАЯ ФУНКЦИЯ: Автоматическое переподключение
 function tryReconnect() {
-    if (isReconnecting || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showReloadMessage();
-        }
-        return;
-    }
+    if (isReconnecting) return;
     
     isReconnecting = true;
     reconnectAttempts++;
@@ -114,10 +109,10 @@ function tryReconnect() {
     showReconnectingMessage();
     
     // После 2 неудачных попыток - автоматическая перезагрузка
-    if (reconnectAttempts === 2) {
+    if (reconnectAttempts >= 2) {
         console.log('Автоматическая перезагрузка после 2 попыток...');
         setTimeout(() => {
-            window.location.reload();
+            window.location.reload(true); // Принудительная перезагрузка
         }, 1000);
         return;
     }
@@ -132,7 +127,7 @@ function tryReconnect() {
     }, 2000);
 }
 
-// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении
+// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении (БЕЗ СЧЕТЧИКА)
 function showReconnectingMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
@@ -141,7 +136,6 @@ function showReconnectingMessage() {
             <div>
                 <h2>Связь прервалась</h2>
                 <p>Пытаюсь восстановить соединение...</p>
-                <p>Попытка ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}</p>
             </div>
         </div>
     `;
@@ -156,7 +150,7 @@ function showReloadMessage() {
             <div>
                 <h2>Не удалось восстановить связь</h2>
                 <p>Попробуйте перезагрузить страницу</p>
-                <button onclick="window.location.reload()" 
+                <button onclick="window.location.reload(true)" 
                         style="padding:10px 20px; background-color:#4CAF50; color:white; 
                                border:none; border-radius:5px; cursor:pointer; margin:5px;">
                     Перезагрузить
@@ -164,6 +158,30 @@ function showReloadMessage() {
             </div>
         </div>
     `;
+}
+
+// НОВАЯ ФУНКЦИЯ: Восстановление нормального интерфейса
+function restoreInterface() {
+    document.body.innerHTML = `
+        <div class="video-container">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="controls">
+                <button id="toggleAudioButton" onclick="toggleAudio()" class="control-button">🎤</button>
+                <button id="toggleVideoButton" onclick="toggleVideo()" class="control-button">🎥</button>
+                <button id="switchCameraButton" onclick="switchCamera()" class="control-button">🔄</button>
+            </div>
+        </div>
+    `;
+    
+    // Восстанавливаем видео потоки
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('remoteVideo').srcObject = remoteStream;
+    
+    // Перепривязываем обработчики событий
+    document.getElementById('toggleAudioButton').onclick = toggleAudio;
+    document.getElementById('toggleVideoButton').onclick = toggleVideo;
+    document.getElementById('switchCameraButton').onclick = switchCamera;
 }
 
 function setupSocketEvents() {
@@ -239,6 +257,9 @@ function createPeerConnection(targetUserId) {
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
         reconnectAttempts = 0;
+        
+        // ВОССТАНАВЛИВАЕМ ИНТЕРФЕЙС ПРИ УСПЕШНОМ ПОДКЛЮЧЕНИИ
+        restoreInterface();
     };
 
     peerConnection.onicecandidate = (event) => {
