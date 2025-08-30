@@ -43,6 +43,9 @@ async function init() {
         setupSocketEvents();
         socket.emit('join-room', roomId);
         
+        // Запускаем периодическую проверку интерфейса
+        setInterval(checkAndRestoreInterface, 1000);
+        
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError('Ошибка при запуске приложения');
@@ -98,6 +101,15 @@ async function switchCamera() {
     }
 }
 
+// НОВАЯ ФУНКЦИЯ: Проверка и восстановление интерфейса
+function checkAndRestoreInterface() {
+    // Если есть remoteStream (соединение восстановлено), но интерфейс не отображается
+    if (remoteStream && document.querySelector('.video-container') === null) {
+        console.log('Восстанавливаем интерфейс после подключения...');
+        restoreInterface();
+    }
+}
+
 // НОВАЯ ФУНКЦИЯ: Автоматическое переподключение
 function tryReconnect() {
     if (isReconnecting) return;
@@ -112,7 +124,7 @@ function tryReconnect() {
     if (reconnectAttempts >= 2) {
         console.log('Автоматическая перезагрузка после 2 попыток...');
         setTimeout(() => {
-            window.location.reload(true); // Принудительная перезагрузка
+            window.location.reload(true);
         }, 1000);
         return;
     }
@@ -121,13 +133,12 @@ function tryReconnect() {
         socket.emit('join-room', roomId);
     }
     
-    // Уменьшили время ожидания с 5 до 2 секунд
     setTimeout(() => {
         isReconnecting = false;
     }, 2000);
 }
 
-// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении (БЕЗ СЧЕТЧИКА)
+// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении
 function showReconnectingMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
@@ -167,16 +178,20 @@ function restoreInterface() {
             <video id="remoteVideo" autoplay playsinline></video>
             <video id="localVideo" autoplay muted playsinline></video>
             <div class="controls">
-                <button id="toggleAudioButton" onclick="toggleAudio()" class="control-button">🎤</button>
-                <button id="toggleVideoButton" onclick="toggleVideo()" class="control-button">🎥</button>
-                <button id="switchCameraButton" onclick="switchCamera()" class="control-button">🔄</button>
+                <button id="toggleAudioButton" class="control-button">🎤</button>
+                <button id="toggleVideoButton" class="control-button">🎥</button>
+                <button id="switchCameraButton" class="control-button">🔄</button>
             </div>
         </div>
     `;
     
     // Восстанавливаем видео потоки
-    document.getElementById('localVideo').srcObject = localStream;
-    document.getElementById('remoteVideo').srcObject = remoteStream;
+    if (localStream) {
+        document.getElementById('localVideo').srcObject = localStream;
+    }
+    if (remoteStream) {
+        document.getElementById('remoteVideo').srcObject = remoteStream;
+    }
     
     // Перепривязываем обработчики событий
     document.getElementById('toggleAudioButton').onclick = toggleAudio;
@@ -259,7 +274,7 @@ function createPeerConnection(targetUserId) {
         reconnectAttempts = 0;
         
         // ВОССТАНАВЛИВАЕМ ИНТЕРФЕЙС ПРИ УСПЕШНОМ ПОДКЛЮЧЕНИИ
-        restoreInterface();
+        checkAndRestoreInterface();
     };
 
     peerConnection.onicecandidate = (event) => {
