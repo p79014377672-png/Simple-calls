@@ -8,26 +8,41 @@ let socket = null;
 let roomId = null;
 let currentFacingMode = 'user';
 let videoTrack = null;
+let isReconnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 50; // Максимум попыток переподключения
 
-// Конфигурация STUN-серверов
+// УЛУЧШЕННАЯ конфигурация STUN-серверов
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.voipbuster.com:3478' },
+        { urls: 'stun:stun.services.mozilla.com:3478' }
+    ],
+    iceCandidatePoolSize: 10,
+    iceTransportPolicy: 'all'
 };
 
 // Инициализация при загрузке страницы
 async function init() {
     try {
-        roomId = window.location.hash.substring(1) || generateRoomId();
-        if (!window.location.hash) {
-            window.location.hash = roomId;
+        const urlParams = new URLSearchParams(window.location.search);
+        roomId = urlParams.get('room') || generateRoomId();
+        
+        if (!urlParams.has('room')) {
+            const newUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+            window.history.replaceState({}, '', newUrl);
         }
+        
         socket = io();
         await startLocalVideo();
         setupSocketEvents();
         socket.emit('join-room', roomId);
+        
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError('Ошибка при запуске приложения');
@@ -80,26 +95,66 @@ async function switchCamera() {
         console.log('Камера переключена на:', newFacingMode);
     } catch (error) {
         console.error('Ошибка при переключении камеры:', error);
-        alert('Не удалось переключить камеру');
     }
+}
+
+// НОВАЯ ФУНКЦИЯ: Автоматическое переподключение
+function tryReconnect() {
+    if (isReconnecting || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    
+    isReconnecting = true;
+    reconnectAttempts++;
+    
+    console.log(`Попытка переподключения #${reconnectAttempts}`);
+    showReconnectingMessage();
+    
+    // Пытаемся переподключиться к комнате
+    if (socket && roomId) {
+        socket.emit('join-room', roomId);
+    }
+    
+    // Даем 5 секунд на попытку, затем повторяем
+    setTimeout(() => {
+        isReconnecting = false;
+    }, 5000);
+}
+
+// НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении
+function showReconnectingMessage() {
+    document.body.innerHTML = `
+        <div style="width:100%; height:100%; background-color:black; color:white; 
+                   display:flex; justify-content:center; align-items:center; 
+                   font-family:sans-serif; text-align:center; padding:20px;">
+            <div>
+                <h2>Связь прервалась</h2>
+                <p>Пытаюсь восстановить соединение...</p>
+                <p>Попытка ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}</p>
+            </div>
+        </div>
+    `;
 }
 
 function setupSocketEvents() {
     socket.on('you-are-the-first', () => {
         console.log('Вы первый в комнате. Ожидаем второго участника...');
     });
+    
     socket.on('user-joined', async (data) => {
         console.log('Новый пользователь присоединился:', data.newUserId);
+        reconnectAttempts = 0; // Сброс счетчика при успешном подключении
         await createOffer(data.newUserId);
     });
+    
     socket.on('offer', async (data) => {
         console.log('Получен offer от:', data.from);
         await createAnswer(data.offer, data.from);
     });
+    
     socket.on('answer', async (data) => {
         console.log('Получен answer от:', data.from);
         await setRemoteAnswer(data.answer);
     });
+    
     socket.on('ice-candidate', async (data) => {
         console.log('Получен ICE candidate от:', data.from);
         try {
@@ -108,22 +163,54 @@ function setupSocketEvents() {
             console.error('Ошибка добавления ICE candidate:', error);
         }
     });
+    
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        simpleHangup();
+        tryReconnect(); // ЗАМЕНИЛИ simpleHangup на tryReconnect
+    });
+    
+    // Обработка разрыва соединения сокета
+    socket.on('disconnect', () => {
+        console.log('Соединение с сервером разорвано');
+        tryReconnect();
+    });
+    
+    socket.on('connect', () => {
+        console.log('Соединение с сервером восстановлено');
+        if (roomId) {
+            socket.emit('join-room', roomId);
+        }
     });
 }
 
 function createPeerConnection(targetUserId) {
     peerConnection = new RTCPeerConnection(configuration);
+
+    // Мониторинг состояния соединения
+    peerConnection.onconnectionstatechange = () => {
+        console.log('Состояние соединения:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'disconnected' || 
+            peerConnection.connectionState === 'failed') {
+            console.log('Соединение разорвано, пытаемся восстановить...');
+            tryReconnect();
+        }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE состояние:', peerConnection.iceConnectionState);
+    };
+
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
     });
+
     peerConnection.ontrack = (event) => {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
+        reconnectAttempts = 0; // Сброс счетчика при успешном подключении
     };
+
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             socket.emit('ice-candidate', {
@@ -132,6 +219,7 @@ function createPeerConnection(targetUserId) {
             });
         }
     };
+
     return peerConnection;
 }
 
@@ -146,6 +234,7 @@ async function createOffer(targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания offer:', error);
+        tryReconnect();
     }
 }
 
@@ -161,6 +250,7 @@ async function createAnswer(offer, targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания answer:', error);
+        tryReconnect();
     }
 }
 
@@ -169,42 +259,13 @@ async function setRemoteAnswer(answer) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     } catch (error) {
         console.error('Ошибка установки remote description:', error);
+        tryReconnect();
     }
 }
 
-// ПРОИЗВЕЛИ ЗАМЕНУ ТЕКСТА И КНОПКИ
-function simpleHangup() {
-    console.log('Завершение звонка');
-    if (localStream) localStream.getTracks().forEach(track => track.stop());
-    if (remoteStream) remoteStream.getTracks().forEach(track => track.stop());
-    if (videoTrack) videoTrack.stop();
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    document.getElementById('localVideo').srcObject = null;
-    document.getElementById('remoteVideo').srcObject = null;
-    document.body.innerHTML = `
-        <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; justify-content:center; align-items:center; 
-                   font-family:sans-serif; text-align:center; padding:20px;">
-            <div>
-                <h2>Связь прервалась</h2>
-                <p>Попробуйте восстановить соединение</p>
-                <button onclick="window.location.reload()" 
-                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
-                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
-                    Восстановить
-                </button>
-            </div>
-        </div>
-    `;
-}
+// УБРАЛИ ФУНКЦИЮ simpleHangup - заменена на tryReconnect
 
-function hangUp() {
-    simpleHangup();
-}
-
+// Переключение аудио
 function toggleAudio() {
     if (localStream) {
         const audioTracks = localStream.getAudioTracks();
@@ -216,6 +277,7 @@ function toggleAudio() {
     }
 }
 
+// Переключение видео
 function toggleVideo() {
     if (localStream) {
         const videoTracks = localStream.getVideoTracks();
@@ -235,11 +297,6 @@ function showError(message) {
             <div>
                 <h2>Ошибка</h2>
                 <p>${message}</p>
-                <button onclick="window.location.reload()" 
-                        style="padding:10px 20px; background-color:#f44336; color:white; 
-                               border:none; border-radius:5px; cursor:pointer;">
-                    Попробовать снова
-                </button>
             </div>
         </div>
     `;

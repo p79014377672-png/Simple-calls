@@ -1,4 +1,3 @@
-/* Убираем все отступы у body и html */
 html, body {
     margin: 0;
     padding: 0;
@@ -10,7 +9,6 @@ html, body {
     overflow: hidden;
 }
 
-/* Основной контейнер видео - РАСТЯГИВАЕМ НА ВЕСЬ ЭКРАН */
 .video-container {
     position: fixed;
     top: 0;
@@ -20,7 +18,6 @@ html, body {
     background-color: #000;
 }
 
-/* Видео собеседника (на ВЕСЬ ЭКРАН) */
 #remoteVideo {
     position: absolute;
     top: 0;
@@ -30,23 +27,22 @@ html, body {
     object-fit: cover;
 }
 
-/* Наше видео (маленькое, в углу) - ИСПРАВЛЕННАЯ ВЕРСИЯ */
+/* НОВОЕ ПОЛОЖЕНИЕ И РАЗМЕР ЛОКАЛЬНОГО ВИДЕО */
 #localVideo {
     position: absolute;
-    bottom: 100px; /* Выше кнопок управления */
-    right: 20px;
-    width: 30vw; /* Ширина 30% от ширины экрана */
-    max-width: 150px;
-    height: 22vh; /* Высота 22% от высоты экрана */
-    max-height: 180px;
+    top: 20px; /* Отступ сверху */
+    left: 20px; /* Отступ слева */
+    width: 12.5%; /* 1/8 от ширины экрана */
+    max-width: 120px;
+    height: 15vh; /* Адаптивная высота */
+    max-height: 150px;
     border: 2px solid white;
     border-radius: 10px;
     z-index: 10;
-    transform: scaleX(-1); /* Зеркальное отображение */
-    object-fit: cover; /* Важно: обрезает чтобы заполнить контейнер */
+    transform: scaleX(-1);
+    object-fit: cover;
 }
 
-/* Панель управления кнопками */
 .controls {
     position: absolute;
     bottom: 30px;
@@ -71,10 +67,6 @@ html, body {
     justify-content: center;
     align-items: center;
     backdrop-filter: blur(5px);
-}
-
-.control-button.hangup {
-    background-color: #f44336;
 }
 
 .control-button:active {

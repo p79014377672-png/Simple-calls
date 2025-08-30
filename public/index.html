@@ -7,20 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Основной контейнер для видео -->
     <div class="video-container">
-        <!-- Видео собеседника (удаленное, на весь экран) -->
         <video id="remoteVideo" autoplay playsinline></video>
-
-        <!-- Наше видео (локальное, маленькое, поверх основного) -->
         <video id="localVideo" autoplay muted playsinline></video>
 
-        <!-- Панель управления кнопками внизу экрана -->
         <div class="controls">
-            <button id="hangupButton" onclick="hangUp()" class="control-button hangup">📞</button>
+            <!-- УБРАЛИ КНОПКУ ЗАВЕРШЕНИЯ -->
             <button id="toggleAudioButton" onclick="toggleAudio()" class="control-button">🎤</button>
             <button id="toggleVideoButton" onclick="toggleVideo()" class="control-button">🎥</button>
-            <!-- НОВАЯ КНОПКА - переключение камер -->
             <button id="switchCameraButton" onclick="switchCamera()" class="control-button">🔄</button>
         </div>
     </div>
