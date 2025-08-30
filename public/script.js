@@ -10,7 +10,7 @@ let currentFacingMode = 'user';
 let videoTrack = null;
 let isReconnecting = false;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 50; // Максимум попыток переподключения
+const MAX_RECONNECT_ATTEMPTS = 50;
 
 // УЛУЧШЕННАЯ конфигурация STUN-серверов
 const configuration = {
@@ -100,7 +100,12 @@ async function switchCamera() {
 
 // НОВАЯ ФУНКЦИЯ: Автоматическое переподключение
 function tryReconnect() {
-    if (isReconnecting || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    if (isReconnecting || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            showReloadMessage();
+        }
+        return;
+    }
     
     isReconnecting = true;
     reconnectAttempts++;
@@ -108,15 +113,23 @@ function tryReconnect() {
     console.log(`Попытка переподключения #${reconnectAttempts}`);
     showReconnectingMessage();
     
-    // Пытаемся переподключиться к комнате
+    // После 2 неудачных попыток - автоматическая перезагрузка
+    if (reconnectAttempts === 2) {
+        console.log('Автоматическая перезагрузка после 2 попыток...');
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+        return;
+    }
+    
     if (socket && roomId) {
         socket.emit('join-room', roomId);
     }
     
-    // Даем 5 секунд на попытку, затем повторяем
+    // Уменьшили время ожидания с 5 до 2 секунд
     setTimeout(() => {
         isReconnecting = false;
-    }, 5000);
+    }, 2000);
 }
 
 // НОВАЯ ФУНКЦИЯ: Показать сообщение о переподключении
@@ -134,6 +147,25 @@ function showReconnectingMessage() {
     `;
 }
 
+// НОВАЯ ФУНКЦИЯ: Показать сообщение о необходимости перезагрузки
+function showReloadMessage() {
+    document.body.innerHTML = `
+        <div style="width:100%; height:100%; background-color:black; color:white; 
+                   display:flex; justify-content:center; align-items:center; 
+                   font-family:sans-serif; text-align:center; padding:20px;">
+            <div>
+                <h2>Не удалось восстановить связь</h2>
+                <p>Попробуйте перезагрузить страницу</p>
+                <button onclick="window.location.reload()" 
+                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
+                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
+                    Перезагрузить
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 function setupSocketEvents() {
     socket.on('you-are-the-first', () => {
         console.log('Вы первый в комнате. Ожидаем второго участника...');
@@ -141,7 +173,7 @@ function setupSocketEvents() {
     
     socket.on('user-joined', async (data) => {
         console.log('Новый пользователь присоединился:', data.newUserId);
-        reconnectAttempts = 0; // Сброс счетчика при успешном подключении
+        reconnectAttempts = 0;
         await createOffer(data.newUserId);
     });
     
@@ -166,10 +198,9 @@ function setupSocketEvents() {
     
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        tryReconnect(); // ЗАМЕНИЛИ simpleHangup на tryReconnect
+        tryReconnect();
     });
     
-    // Обработка разрыва соединения сокета
     socket.on('disconnect', () => {
         console.log('Соединение с сервером разорвано');
         tryReconnect();
@@ -186,7 +217,6 @@ function setupSocketEvents() {
 function createPeerConnection(targetUserId) {
     peerConnection = new RTCPeerConnection(configuration);
 
-    // Мониторинг состояния соединения
     peerConnection.onconnectionstatechange = () => {
         console.log('Состояние соединения:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'disconnected' || 
@@ -208,7 +238,7 @@ function createPeerConnection(targetUserId) {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         document.getElementById('remoteVideo').srcObject = remoteStream;
-        reconnectAttempts = 0; // Сброс счетчика при успешном подключении
+        reconnectAttempts = 0;
     };
 
     peerConnection.onicecandidate = (event) => {
@@ -263,9 +293,6 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// УБРАЛИ ФУНКЦИЮ simpleHangup - заменена на tryReconnect
-
-// Переключение аудио
 function toggleAudio() {
     if (localStream) {
         const audioTracks = localStream.getAudioTracks();
@@ -277,7 +304,6 @@ function toggleAudio() {
     }
 }
 
-// Переключение видео
 function toggleVideo() {
     if (localStream) {
         const videoTracks = localStream.getVideoTracks();
