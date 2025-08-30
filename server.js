@@ -24,6 +24,15 @@ const rooms = new Map();
 io.on('connection', (socket) => {
     console.log('Пользователь подключился:', socket.id);
 
+    // Обработчик статусов пользователя (аудио/видео)
+    socket.on('user-status', (data) => {
+        console.log(`Статус от ${socket.id}:`, data);
+        // Пересылаем статус всем в комнате, кроме отправителя
+        if (socket.roomId) {
+            socket.to(socket.roomId).emit('user-status', data);
+        }
+    });
+
     socket.on('join-room', (roomId) => {
         socket.roomId = roomId;
         socket.join(roomId);
@@ -69,7 +78,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // УБИРАЕМ force-hangup и блокировку комнат
     socket.on('disconnect', () => {
         console.log('Пользователь отключился:', socket.id);
 

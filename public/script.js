@@ -101,9 +101,35 @@ async function switchCamera() {
     }
 }
 
+// НОВАЯ ФУНКЦИЯ: Показать уведомление о статусе
+function showStatusNotification(message, type) {
+    const notifications = document.getElementById('statusNotifications');
+    const notification = document.createElement('div');
+    notification.className = `status-notification status-${type}`;
+    notification.textContent = message;
+    
+    notifications.appendChild(notification);
+    
+    // Автоматически скрываем через 5 секунд
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
+}
+
+// НОВАЯ ФУНКЦИЯ: Отправить статус аудио/видео собеседнику
+function sendStatusToPeer() {
+    if (socket && roomId) {
+        socket.emit('user-status', {
+            audioMuted: isAudioMuted,
+            videoOff: isVideoOff
+        });
+    }
+}
+
 // НОВАЯ ФУНКЦИЯ: Проверка и восстановление интерфейса
 function checkAndRestoreInterface() {
-    // Если есть remoteStream (соединение восстановлено), но интерфейс не отображается
     if (remoteStream && document.querySelector('.video-container') === null) {
         console.log('Восстанавливаем интерфейс после подключения...');
         restoreInterface();
@@ -120,7 +146,6 @@ function tryReconnect() {
     console.log(`Попытка переподключения #${reconnectAttempts}`);
     showReconnectingMessage();
     
-    // После 2 неудачных попыток - автоматическая перезагрузка
     if (reconnectAttempts >= 2) {
         console.log('Автоматическая перезагрузка после 2 попыток...');
         setTimeout(() => {
@@ -180,12 +205,11 @@ function restoreInterface() {
             <div class="controls">
                 <button id="toggleAudioButton" class="control-button">🎤</button>
                 <button id="toggleVideoButton" class="control-button">🎥</button>
-                <button id="switchCameraButton" class="control-button">🔄</button>
             </div>
+            <div id="statusNotifications" class="status-notifications"></div>
         </div>
     `;
     
-    // Восстанавливаем видео потоки
     if (localStream) {
         document.getElementById('localVideo').srcObject = localStream;
     }
@@ -196,7 +220,7 @@ function restoreInterface() {
     // Перепривязываем обработчики событий
     document.getElementById('toggleAudioButton').onclick = toggleAudio;
     document.getElementById('toggleVideoButton').onclick = toggleVideo;
-    document.getElementById('switchCameraButton').onclick = switchCamera;
+    document.getElementById('localVideo').onclick = switchCamera;
 }
 
 function setupSocketEvents() {
@@ -226,6 +250,19 @@ function setupSocketEvents() {
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (error) {
             console.error('Ошибка добавления ICE candidate:', error);
+        }
+    });
+    
+    // НОВЫЙ ОБРАБОТЧИК: Получение статуса от собеседника
+    socket.on('user-status', (data) => {
+        console.log('Получен статус от собеседника:', data);
+        
+        if (data.audioMuted) {
+            showStatusNotification('Собеседник отключил микрофон', 'audio-muted');
+        }
+        
+        if (data.videoOff) {
+            showStatusNotification('Собеседник отключил камеру', 'video-off');
         }
     });
     
@@ -273,7 +310,6 @@ function createPeerConnection(targetUserId) {
         document.getElementById('remoteVideo').srcObject = remoteStream;
         reconnectAttempts = 0;
         
-        // ВОССТАНАВЛИВАЕМ ИНТЕРФЕЙС ПРИ УСПЕШНОМ ПОДКЛЮЧЕНИИ
         checkAndRestoreInterface();
     };
 
@@ -336,6 +372,14 @@ function toggleAudio() {
             isAudioMuted = !isAudioMuted;
             audioTracks[0].enabled = !isAudioMuted;
             document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
+            
+            // Отправляем статус собеседнику
+            sendStatusToPeer();
+            
+            // Показываем уведомление себе
+            if (isAudioMuted) {
+                showStatusNotification('Вы отключили микрофон', 'audio-muted');
+            }
         }
     }
 }
@@ -347,6 +391,14 @@ function toggleVideo() {
             isVideoOff = !isVideoOff;
             videoTracks[0].enabled = !isVideoOff;
             document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
+            
+            // Отправляем статус собеседнику
+            sendStatusToPeer();
+            
+            // Показываем уведомление себе
+            if (isVideoOff) {
+                showStatusNotification('Вы отключили камеру', 'video-off');
+            }
         }
     }
 }

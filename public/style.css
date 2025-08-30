@@ -27,7 +27,7 @@ html, body {
     object-fit: cover;
 }
 
-/* Локальное видео */
+/* Локальное видео с курсором-указателем */
 #localVideo {
     position: absolute;
     top: 20px;
@@ -41,28 +41,29 @@ html, body {
     z-index: 10;
     transform: scaleX(-1);
     object-fit: cover;
+    cursor: pointer; /* Указываем, что это кликабельный элемент */
 }
 
-/* НОВОЕ ПОЛОЖЕНИЕ КНОПОК - ВВЕРХУ */
+/* Новое расположение кнопок - горизонтально рядом с видео */
 .controls {
     position: absolute;
-    top: 20px; /* Переместили вверх */
-    right: 20px; /* Справа */
+    top: 20px;
+    left: calc(20px + 20vw + 10px); /* Справа от локального видео */
+    max-left: calc(20px + 180px + 10px); /* Учитываем max-width */
     display: flex;
-    flex-direction: column; /* Вертикально */
+    flex-direction: row; /* Горизонтально */
     gap: 10px;
     z-index: 20;
 }
 
-/* УМЕНЬШИЛИ РАЗМЕР КНОПОК НА 20% */
 .control-button {
-    width: 44px; /* Было 55px - уменьшили на 20% */
-    height: 44px; /* Было 55px - уменьшили на 20% */
+    width: 44px;
+    height: 44px;
     border: none;
     border-radius: 50%;
     background-color: rgba(255, 255, 255, 0.2);
     color: white;
-    font-size: 1.2em; /* Немного уменьшили размер иконок */
+    font-size: 1.2em;
     cursor: pointer;
     display: flex;
     justify-content: center;
@@ -72,4 +73,32 @@ html, body {
 
 .control-button:active {
     transform: scale(0.95);
+}
+
+/* Стили для уведомлений о статусе */
+.status-notifications {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    text-align: center;
+}
+
+.status-notification {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    margin: 5px 0;
+    font-size: 14px;
+    backdrop-filter: blur(5px);
+}
+
+.status-audio-muted {
+    border-left: 4px solid #f44336;
+}
+
+.status-video-off {
+    border-left: 4px solid #ff9800;
 }

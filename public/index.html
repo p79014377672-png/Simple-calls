@@ -9,14 +9,15 @@
 <body>
     <div class="video-container">
         <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay muted playsinline></video>
-
+        <video id="localVideo" autoplay muted playsinline onclick="switchCamera()"></video>
+        
         <div class="controls">
-            <!-- УБРАЛИ КНОПКУ ЗАВЕРШЕНИЯ -->
-            <button id="toggleAudioButton" onclick="toggleAudio()" class="control-button">🎤</button>
-            <button id="toggleVideoButton" onclick="toggleVideo()" class="control-button">🎥</button>
-            <button id="switchCameraButton" onclick="switchCamera()" class="control-button">🔄</button>
+            <button id="toggleAudioButton" class="control-button">🎤</button>
+            <button id="toggleVideoButton" class="control-button">🎥</button>
         </div>
+        
+        <!-- Блок уведомлений о статусе -->
+        <div id="statusNotifications" class="status-notifications"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
