@@ -66,7 +66,7 @@ async function startLocalVideo() {
         videoTrack = localStream.getVideoTracks()[0];
         document.getElementById('localVideo').srcObject = localStream;
     } catch (error) {
-        console.error('Ошибка доaccess к камере/микрофону:', error);
+        console.error('Ошибка доступа к камере/микрофону:', error);
         showError('Не удалось получить доступ к камере и микрофону');
     }
 }
@@ -292,20 +292,58 @@ function setupSocketEvents() {
     });
 }
 
+// НОВАЯ ФУНКЦИЯ: Таймаут для операций WebRTC
+function waitWithTimeout(promise, timeoutMs, errorMessage) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+        )
+    ]);
+}
+
 function createPeerConnection(targetUserId) {
     peerConnection = new RTCPeerConnection(configuration);
 
     peerConnection.onconnectionstatechange = () => {
-        console.log('Состояние соединения:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'disconnected' || 
-            peerConnection.connectionState === 'failed') {
-            console.log('Соединение разорвано, пытаемся восстановить...');
-            tryReconnect();
+        const state = peerConnection.connectionState;
+        console.log('Состояние PeerConnection:', state);
+        // БОЛЕЕ ДЕТАЛЬНАЯ ОБРАБОТКА КАЖДОГО СОСТОЯНИЯ
+        switch(state) {
+            case 'connected':
+                // Peers connected!
+                showStatusNotification('Соединение установлено', 'connected');
+                reconnectAttempts = 0;
+                isReconnecting = false;
+                break;
+            case 'disconnected':
+            case 'failed':
+                console.log('Соединение разорвано или не удалось...');
+                // Не пытаемся переподключаться сразу, ждем события от сервера о том, что пользователь вышел
+                // tryReconnect() вызывается из события 'user-left'
+                break;
+            case 'closed':
+                console.log('Соединение полностью закрыто');
+                break;
         }
     };
 
     peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE состояние:', peerConnection.iceConnectionState);
+        const state = peerConnection.iceConnectionState;
+        console.log('ICE состояние:', state);
+        // Логируем все состояния ICE для диагностики
+        if (state === 'failed') {
+            console.error('ICE Gathering завершилось ошибкой. Возможно, проблемы с сетью.');
+            // Здесь можно попробовать пересоздать offer/answer, но часто помогает только переподключение
+        }
+        if (state === 'disconnected') {
+            console.log('ICE соединение разорвано (возможно, временные проблемы с сетью).');
+        }
+    };
+
+    // Логируем события ICE Gathering
+    peerConnection.onicegatheringstatechange = () => {
+        console.log('ICE Gathering состояние:', peerConnection.iceGatheringState);
     };
 
     localStream.getTracks().forEach(track => {
@@ -336,31 +374,54 @@ function createPeerConnection(targetUserId) {
 async function createOffer(targetUserId) {
     try {
         peerConnection = createPeerConnection(targetUserId);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
+        // ДОБАВЛЯЕМ ТАЙМАУТ НА СОЗДАНИЕ OFFER
+        const offer = await waitWithTimeout(
+            peerConnection.createOffer(),
+            10000, // 10 секунд
+            'Таймаут при создании offer'
+        );
+        await waitWithTimeout(
+            peerConnection.setLocalDescription(offer),
+            5000, // 5 секунд
+            'Таймаут при установке local description'
+        );
         socket.emit('offer', {
             targetUserId: targetUserId,
             offer: offer
         });
     } catch (error) {
         console.error('Ошибка создания offer:', error);
-        tryReconnect();
+        showStatusNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        // tryReconnect(); // Пока не вызываем, ждем событий от сервера
     }
 }
 
 async function createAnswer(offer, targetUserId) {
     try {
         peerConnection = createPeerConnection(targetUserId);
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+        await waitWithTimeout(
+            peerConnection.setRemoteDescription(new RTCSessionDescription(offer)),
+            5000,
+            'Таймаут при установке remote description (offer)'
+        );
+        const answer = await waitWithTimeout(
+            peerConnection.createAnswer(),
+            10000,
+            'Таймаут при создании answer'
+        );
+        await waitWithTimeout(
+            peerConnection.setLocalDescription(answer),
+            5000,
+            'Таймаут при установке local description (answer)'
+        );
         socket.emit('answer', {
             targetUserId: targetUserId,
             answer: answer
         });
     } catch (error) {
         console.error('Ошибка создания answer:', error);
-        tryReconnect();
+        showStatusNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        // tryReconnect();
     }
 }
 
