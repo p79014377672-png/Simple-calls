@@ -244,6 +244,10 @@ function setupSocketEvents() {
             console.error('Ошибка добавления ICE candidate:', error);
         }
     });
+socket.on('room-full', () => {
+    console.error('Комната уже занята!');
+    showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
+});
     
     // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СТАТУСОВ
     socket.on('user-status', (data) => {
