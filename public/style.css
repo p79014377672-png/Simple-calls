@@ -38,6 +38,7 @@ html, body {
     border: 2px solid white;
     border-radius: 10px;
     z-index: 10;
+    /* ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ЛОКАЛЬНОГО ПРОСМОТРА */
     transform: scaleX(-1);
     object-fit: cover;
     cursor: pointer;

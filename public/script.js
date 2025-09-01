@@ -85,7 +85,10 @@ async function startLocalVideo() {
             audio: true 
         });
         videoTrack = localStream.getVideoTracks()[0];
-        document.getElementById('localVideo').srcObject = localStream;
+        const localVideo = document.getElementById('localVideo');
+        localVideo.srcObject = localStream;
+        // ПРИМЕНЯЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
+        localVideo.style.transform = 'scaleX(-1)';
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
         showError('Не удалось получить доступ к камере и микрофону');
@@ -109,7 +112,10 @@ async function switchCamera() {
             localStream.addTrack(newVideoTrack);
             videoTrack = newVideoTrack;
         }
-        document.getElementById('localVideo').srcObject = localStream;
+        const localVideo = document.getElementById('localVideo');
+        localVideo.srcObject = localStream;
+        // ПРИМЕНЯЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
+        localVideo.style.transform = 'scaleX(-1)';
         if (peerConnection) {
             const sender = peerConnection.getSenders().find(s => 
                 s.track && s.track.kind === 'video'
@@ -148,7 +154,7 @@ function updatePersistentNotifications() {
     }
 }
 
-// Функция для временных уведомлений (ОСТАЕТСЯ для уведомлений о соединении)
+// Функция для временных уведомлений (для уведомлений о соединении)
 function showTemporaryNotification(message, type) {
     const notifications = document.getElementById('statusNotifications');
     const notification = document.createElement('div');
@@ -290,7 +296,10 @@ function restoreInterface() {
     
     // Восстанавливаем видео потоки
     if (localStream) {
-        document.getElementById('localVideo').srcObject = localStream;
+        const localVideo = document.getElementById('localVideo');
+        localVideo.srcObject = localStream;
+        // ВОССТАНАВЛИВАЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
+        localVideo.style.transform = 'scaleX(-1)';
     }
     if (remoteStream) {
         document.getElementById('remoteVideo').srcObject = remoteStream;
@@ -413,7 +422,7 @@ function createPeerConnection(targetUserId) {
         console.log('Состояние PeerConnection:', state);
         switch(state) {
             case 'connected':
-                showTemporaryNotification('Соединение установлено', 'connected'); // ОСТАЕТСЯ
+                showTemporaryNotification('Соединение установлено', 'connected');
                 reconnectAttempts = 0;
                 isReconnecting = false;
                 break;
@@ -479,143 +488,3 @@ async function createOffer(targetUserId) {
         peerConnection = createPeerConnection(targetUserId);
         const offer = await waitWithTimeout(
             peerConnection.createOffer(),
-            10000,
-            'Таймаут при создании offer'
-        );
-        await waitWithTimeout(
-            peerConnection.setLocalDescription(offer),
-            5000,
-            'Таймаут при установке local description'
-        );
-        socket.emit('offer', {
-            targetUserId: targetUserId,
-            offer: offer
-        });
-    } catch (error) {
-        console.error('Ошибка создания offer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error'); // ОСТАЕТСЯ
-    }
-}
-
-async function createAnswer(offer, targetUserId) {
-    try {
-        peerConnection = createPeerConnection(targetUserId);
-        await waitWithTimeout(
-            peerConnection.setRemoteDescription(new RTCSessionDescription(offer)),
-            5000,
-            'Таймаут при установке remote description (offer)'
-        );
-        const answer = await waitWithTimeout(
-            peerConnection.createAnswer(),
-            10000,
-            'Таймаут при создании answer'
-        );
-        await waitWithTimeout(
-            peerConnection.setLocalDescription(answer),
-            5000,
-            'Таймаут при установке local description (answer)'
-        );
-        socket.emit('answer', {
-            targetUserId: targetUserId,
-            answer: answer
-        });
-    } catch (error) {
-        console.error('Ошибка создания answer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error'); // ОСТАЕТСЯ
-    }
-}
-
-async function setRemoteAnswer(answer) {
-    try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-    } catch (error) {
-        console.error('Ошибка установки remote description:', error);
-        tryReconnect();
-    }
-}
-
-// ФУНКЦИЯ toggleAudio (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
-async function toggleAudio() {
-    if (isProcessingAudio) return;
-    
-    isProcessingAudio = true;
-    console.log('Переключение аудио...');
-    
-    try {
-        if (localStream) {
-            const audioTracks = localStream.getAudioTracks();
-            if (audioTracks.length > 0) {
-                isAudioMuted = !isAudioMuted;
-                audioTracks[0].enabled = !isAudioMuted;
-                
-                const button = document.getElementById('toggleAudioButton');
-                button.textContent = isAudioMuted ? '🎤❌' : '🎤';
-                
-                button.style.transform = 'scale(0.9)';
-                setTimeout(() => {
-                    button.style.transform = 'scale(1)';
-                }, 150);
-                
-                sendStatusToPeer();
-            }
-        }
-    } catch (error) {
-        console.error('Ошибка переключения аудио:', error);
-    } finally {
-        setTimeout(() => {
-            isProcessingAudio = false;
-        }, 300);
-    }
-}
-
-// ФУНКЦИЯ toggleVideo (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
-async function toggleVideo() {
-    if (isProcessingVideo) return;
-    
-    isProcessingVideo = true;
-    console.log('Переключение видео...');
-    
-    try {
-        if (localStream) {
-            const videoTracks = localStream.getVideoTracks();
-            if (videoTracks.length > 0) {
-                isVideoOff = !isVideoOff;
-                videoTracks[0].enabled = !isVideoOff;
-                
-                const button = document.getElementById('toggleVideoButton');
-                button.textContent = isVideoOff ? '🎥❌' : '🎥';
-                
-                button.style.transform = 'scale(0.9)';
-                setTimeout(() => {
-                    button.style.transform = 'scale(1)';
-                }, 150);
-                
-                sendStatusToPeer();
-            }
-        }
-    } catch (error) {
-        console.error('Ошибка переключения видео:', error);
-    } finally {
-        setTimeout(() => {
-            isProcessingVideo = false;
-        }, 300);
-    }
-}
-
-function showError(message) {
-    document.body.innerHTML = `
-        <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; justify-content:center; align-items:center; 
-                   font-family:sans-serif; text-align:center; padding:20px;">
-            <div>
-                <h2>Ошибка</h2>
-                <p>${message}</p>
-                <button onclick="window.location.reload(true)" class="reload-button">
-                    Обновить
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-document.addEventListener('DOMContentLoaded', init);
