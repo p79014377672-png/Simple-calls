@@ -488,3 +488,143 @@ async function createOffer(targetUserId) {
         peerConnection = createPeerConnection(targetUserId);
         const offer = await waitWithTimeout(
             peerConnection.createOffer(),
+            10000,
+            'Таймаут при создании offer'
+        );
+        await waitWithTimeout(
+            peerConnection.setLocalDescription(offer),
+            5000,
+            'Таймаут при установке local description'
+        );
+        socket.emit('offer', {
+            targetUserId: targetUserId,
+            offer: offer
+        });
+    } catch (error) {
+        console.error('Ошибка создания offer:', error);
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+    }
+}
+
+async function createAnswer(offer, targetUserId) {
+    try {
+        peerConnection = createPeerConnection(targetUserId);
+        await waitWithTimeout(
+            peerConnection.setRemoteDescription(new RTCSessionDescription(offer)),
+            5000,
+            'Таймаут при установке remote description (offer)'
+        );
+        const answer = await waitWithTimeout(
+            peerConnection.createAnswer(),
+            10000,
+            'Таймаут при создании answer'
+        );
+        await waitWithTimeout(
+            peerConnection.setLocalDescription(answer),
+            5000,
+            'Таймаут при установке local description (answer)'
+        );
+        socket.emit('answer', {
+            targetUserId: targetUserId,
+            answer: answer
+        });
+    } catch (error) {
+        console.error('Ошибка создания answer:', error);
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+    }
+}
+
+async function setRemoteAnswer(answer) {
+    try {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    } catch (error) {
+        console.error('Ошибка установки remote description:', error);
+        tryReconnect();
+    }
+}
+
+// ФУНКЦИЯ toggleAudio (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
+async function toggleAudio() {
+    if (isProcessingAudio) return;
+    
+    isProcessingAudio = true;
+    console.log('Переключение аудио...');
+    
+    try {
+        if (localStream) {
+            const audioTracks = localStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                isAudioMuted = !isAudioMuted;
+                audioTracks[0].enabled = !isAudioMuted;
+                
+                const button = document.getElementById('toggleAudioButton');
+                button.textContent = isAudioMuted ? '🎤❌' : '🎤';
+                
+                button.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                }, 150);
+                
+                sendStatusToPeer();
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка переключения аудио:', error);
+    } finally {
+        setTimeout(() => {
+            isProcessingAudio = false;
+        }, 300);
+    }
+}
+
+// ФУНКЦИЯ toggleVideo (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
+async function toggleVideo() {
+    if (isProcessingVideo) return;
+    
+    isProcessingVideo = true;
+    console.log('Переключение видео...');
+    
+    try {
+        if (localStream) {
+            const videoTracks = localStream.getVideoTracks();
+            if (videoTracks.length > 0) {
+                isVideoOff = !isVideoOff;
+                videoTracks[0].enabled = !isVideoOff;
+                
+                const button = document.getElementById('toggleVideoButton');
+                button.textContent = isVideoOff ? '🎥❌' : '🎥';
+                
+                button.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                }, 150);
+                
+                sendStatusToPeer();
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка переключения видео:', error);
+    } finally {
+        setTimeout(() => {
+            isProcessingVideo = false;
+        }, 300);
+    }
+}
+
+function showError(message) {
+    document.body.innerHTML = `
+        <div style="width:100%; height:100%; background-color:black; color:white; 
+                   display:flex; justify-content:center; align-items:center; 
+                   font-family:sans-serif; text-align:center; padding:20px;">
+            <div>
+                <h2>Ошибка</h2>
+                <p>${message}</p>
+                <button onclick="window.location.reload(true)" class="reload-button">
+                    Обновить
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+document.addEventListener('DOMContentLoaded', init);
