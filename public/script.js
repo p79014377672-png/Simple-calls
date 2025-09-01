@@ -49,7 +49,25 @@ async function init() {
         setupSocketEvents();
         socket.emit('join-room', roomId);
         
-        setInterval(checkAndRestoreInterface, 1000);
+        // УБРАН setInterval - он вызывал мерцание
+        // Правильная инициализация обработчиков после загрузки
+        setTimeout(() => {
+            const audioButton = document.getElementById('toggleAudioButton');
+            const videoButton = document.getElementById('toggleVideoButton');
+            const localVideo = document.getElementById('localVideo');
+            
+            if (audioButton) {
+                audioButton.onclick = toggleAudio;
+                audioButton._listenerAttached = true;
+            }
+            if (videoButton) {
+                videoButton.onclick = toggleVideo;
+                videoButton._listenerAttached = true;
+            }
+            if (localVideo) {
+                localVideo.onclick = switchCamera;
+            }
+        }, 1000);
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
@@ -102,7 +120,7 @@ async function switchCamera() {
         newStream.getAudioTracks().forEach(track => track.stop());
         console.log('Камера переключена на:', newFacingMode);
     } catch (error) {
-        console.error('Ошибка при переключении камеры:', error);
+        console.error('Ошибка при переключении камеря:', error);
     }
 }
 
@@ -156,12 +174,10 @@ function sendStatusToPeer() {
 }
 
 function checkAndRestoreInterface() {
-    if (remoteStream && document.querySelector('.video-container') === null) {
-        console.log('Восстанавливаем интерфейс после подключения...');
+    // Эта функция теперь нужна только для крайних случаев
+    if (document.querySelector('.video-container') === null) {
+        console.log('Полное восстановление интерфейса...');
         restoreInterface();
-    } else {
-        // Просто обновляем интерфейс, если он уже есть
-        updateInterface();
     }
 }
 
@@ -223,42 +239,42 @@ function showReloadMessage() {
     `;
 }
 
-// Функция для обновления интерфейса без пересоздания
+// Функция для обновления интерфейса без пересоздания (ИСПРАВЛЕННАЯ)
 function updateInterface() {
-    // Обновляем видео потоки (если элементы существуют)
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    
-    if (localVideo && localStream) {
-        localVideo.srcObject = localStream;
-    }
-    if (remoteVideo && remoteStream) {
-        remoteVideo.srcObject = remoteStream;
-    }
-    
-    // Обновляем состояние кнопок (если они существуют)
+    // ТОЛЬКО обновляем состояние кнопок (главная проблема)
     const audioButton = document.getElementById('toggleAudioButton');
     const videoButton = document.getElementById('toggleVideoButton');
     
     if (audioButton) {
         audioButton.textContent = isAudioMuted ? '🎤❌' : '🎤';
+        // Важно: не перепривязываем обработчики, если они уже есть
+        if (!audioButton._listenerAttached) {
+            audioButton.onclick = toggleAudio;
+            audioButton._listenerAttached = true;
+        }
     }
+    
     if (videoButton) {
         videoButton.textContent = isVideoOff ? '🎥❌' : '🎥';
+        if (!videoButton._listenerAttached) {
+            videoButton.onclick = toggleVideo;
+            videoButton._listenerAttached = true;
+        }
     }
     
     // Обновляем постоянные уведомления
     updatePersistentNotifications();
+    
+    // НЕ обновляем видео элементы если они уже установлены!
+    // Это вызывает мерцание
 }
 
+// Функция для полного восстановления интерфейса (ИСПРАВЛЕННАЯ)
 function restoreInterface() {
-    // Проверяем, не восстановлен ли уже интерфейс
     if (document.querySelector('.video-container')) {
-        updateInterface();
-        return;
+        return; // Интерфейс уже существует
     }
     
-    // Полное восстановление только если интерфейс действительно пропал
     document.body.innerHTML = `
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
@@ -275,13 +291,36 @@ function restoreInterface() {
         </div>
     `;
     
-    // Восстанавливаем обработчики
-    document.getElementById('toggleAudioButton').onclick = toggleAudio;
-    document.getElementById('toggleVideoButton').onclick = toggleVideo;
-    document.getElementById('localVideo').onclick = switchCamera;
+    // Восстанавливаем видео потоки
+    if (localStream) {
+        document.getElementById('localVideo').srcObject = localStream;
+    }
+    if (remoteStream) {
+        document.getElementById('remoteVideo').srcObject = remoteStream;
+    }
     
-    // Обновляем состояние
-    updateInterface();
+    // Привязываем обработчики и помечаем их как привязанные
+    const audioButton = document.getElementById('toggleAudioButton');
+    const videoButton = document.getElementById('toggleVideoButton');
+    const localVideo = document.getElementById('localVideo');
+    
+    if (audioButton) {
+        audioButton.onclick = toggleAudio;
+        audioButton._listenerAttached = true;
+        audioButton.textContent = isAudioMuted ? '🎤❌' : '🎤';
+    }
+    
+    if (videoButton) {
+        videoButton.onclick = toggleVideo;
+        videoButton._listenerAttached = true;
+        videoButton.textContent = isVideoOff ? '🎥❌' : '🎥';
+    }
+    
+    if (localVideo) {
+        localVideo.onclick = switchCamera;
+    }
+    
+    updatePersistentNotifications();
 }
 
 function setupSocketEvents() {
@@ -430,10 +469,17 @@ function createPeerConnection(targetUserId) {
     peerConnection.ontrack = (event) => {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
-        document.getElementById('remoteVideo').srcObject = remoteStream;
+        
+        // Устанавливаем видео поток ТОЛЬКО если элемент существует и поток еще не установлен
+        const remoteVideo = document.getElementById('remoteVideo');
+        if (remoteVideo && !remoteVideo.srcObject) {
+            remoteVideo.srcObject = remoteStream;
+        }
+        
         reconnectAttempts = 0;
         
-        updateInterface(); // ОБНОВЛЯЕМ, а не пересоздаем интерфейс
+        // Просто обновляем интерфейс (кнопки, уведомления)
+        updateInterface();
     };
 
     peerConnection.onicecandidate = (event) => {
