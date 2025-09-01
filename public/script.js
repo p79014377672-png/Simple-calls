@@ -159,6 +159,9 @@ function checkAndRestoreInterface() {
     if (remoteStream && document.querySelector('.video-container') === null) {
         console.log('Восстанавливаем интерфейс после подключения...');
         restoreInterface();
+    } else {
+        // Просто обновляем интерфейс, если он уже есть
+        updateInterface();
     }
 }
 
@@ -191,11 +194,14 @@ function tryReconnect() {
 function showReconnectingMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; justify-content:center; align-items:center; 
+                   display:flex; flex-direction:column; justify-content:center; align-items:center; 
                    font-family:sans-serif; text-align:center; padding:20px;">
             <div>
                 <h2>Связь прервалась</h2>
                 <p>Пытаюсь восстановить соединение...</p>
+                <button onclick="window.location.reload(true)" class="reload-button">
+                    Обновить
+                </button>
             </div>
         </div>
     `;
@@ -204,22 +210,55 @@ function showReconnectingMessage() {
 function showReloadMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; justify-content:center; align-items:center; 
+                   display:flex; flex-direction:column; justify-content:center; align-items:center; 
                    font-family:sans-serif; text-align:center; padding:20px;">
             <div>
                 <h2>Не удалось восстановить связь</h2>
                 <p>Попробуйте перезагрузить страницу</p>
-                <button onclick="window.location.reload(true)" 
-                        style="padding:10px 20px; background-color:#4CAF50; color:white; 
-                               border:none; border-radius:5px; cursor:pointer; margin:5px;">
-                    Перезагрузить
+                <button onclick="window.location.reload(true)" class="reload-button">
+                    Обновить
                 </button>
             </div>
         </div>
     `;
 }
 
+// Функция для обновления интерфейса без пересоздания
+function updateInterface() {
+    // Обновляем видео потоки (если элементы существуют)
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    
+    if (localVideo && localStream) {
+        localVideo.srcObject = localStream;
+    }
+    if (remoteVideo && remoteStream) {
+        remoteVideo.srcObject = remoteStream;
+    }
+    
+    // Обновляем состояние кнопок (если они существуют)
+    const audioButton = document.getElementById('toggleAudioButton');
+    const videoButton = document.getElementById('toggleVideoButton');
+    
+    if (audioButton) {
+        audioButton.textContent = isAudioMuted ? '🎤❌' : '🎤';
+    }
+    if (videoButton) {
+        videoButton.textContent = isVideoOff ? '🎥❌' : '🎥';
+    }
+    
+    // Обновляем постоянные уведомления
+    updatePersistentNotifications();
+}
+
 function restoreInterface() {
+    // Проверяем, не восстановлен ли уже интерфейс
+    if (document.querySelector('.video-container')) {
+        updateInterface();
+        return;
+    }
+    
+    // Полное восстановление только если интерфейс действительно пропал
     document.body.innerHTML = `
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
@@ -236,23 +275,13 @@ function restoreInterface() {
         </div>
     `;
     
-    if (localStream) {
-        document.getElementById('localVideo').srcObject = localStream;
-    }
-    if (remoteStream) {
-        document.getElementById('remoteVideo').srcObject = remoteStream;
-    }
-    
+    // Восстанавливаем обработчики
     document.getElementById('toggleAudioButton').onclick = toggleAudio;
     document.getElementById('toggleVideoButton').onclick = toggleVideo;
     document.getElementById('localVideo').onclick = switchCamera;
     
-    // Восстанавливаем состояние кнопок
-    document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
-    document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
-    
-    // Восстанавливаем постоянные уведомления о статусе собеседника
-    updatePersistentNotifications();
+    // Обновляем состояние
+    updateInterface();
 }
 
 function setupSocketEvents() {
@@ -291,7 +320,7 @@ function setupSocketEvents() {
         showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
     });
     
-    // НОВЫЙ ОБРАБОТЧИК СТАТУСОВ
+    // ОБРАБОТЧИК СТАТУСОВ
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
@@ -347,7 +376,7 @@ function setupSocketEvents() {
     });
 }
 
-// Новая функция: Таймаут для операций WebRTC
+// Функция: Таймаут для операций WebRTC
 function waitWithTimeout(promise, timeoutMs, errorMessage) {
     return Promise.race([
         promise,
@@ -404,7 +433,7 @@ function createPeerConnection(targetUserId) {
         document.getElementById('remoteVideo').srcObject = remoteStream;
         reconnectAttempts = 0;
         
-        checkAndRestoreInterface();
+        updateInterface(); // ОБНОВЛЯЕМ, а не пересоздаем интерфейс
     };
 
     peerConnection.onicecandidate = (event) => {
@@ -565,6 +594,9 @@ function showError(message) {
             <div>
                 <h2>Ошибка</h2>
                 <p>${message}</p>
+                <button onclick="window.location.reload(true)" class="reload-button">
+                    Обновить
+                </button>
             </div>
         </div>
     `;

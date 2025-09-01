@@ -100,12 +100,15 @@ html, body {
     border-left: 4px solid #ff9800;
 }
 
-/* Стили для постоянных уведомлений о статусе собеседника */
+/* Стили для постоянных уведомлений о статусе собеседника (ПЕРЕМЕЩЕНЫ ВНИЗ СПРАВА) */
 .persistent-notifications {
     position: absolute;
-    top: 70px;
-    left: 20px;
+    bottom: 70px;
+    right: 20px;
     z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 }
 
 .persistent-notification {
@@ -131,4 +134,21 @@ html, body {
 
 .persistent-notification.hidden {
     display: none;
+}
+
+/* Стили для кнопки обновления */
+.reload-button {
+    padding: 12px 24px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+}
+
+.reload-button:hover {
+    background-color: #45a049;
 }
