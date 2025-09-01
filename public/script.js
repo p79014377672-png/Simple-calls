@@ -49,7 +49,6 @@ async function init() {
         setupSocketEvents();
         socket.emit('join-room', roomId);
         
-        // УБРАН setInterval - он вызывал мерцание
         // Правильная инициализация обработчиков после загрузки
         setTimeout(() => {
             const audioButton = document.getElementById('toggleAudioButton');
@@ -120,7 +119,7 @@ async function switchCamera() {
         newStream.getAudioTracks().forEach(track => track.stop());
         console.log('Камера переключена на:', newFacingMode);
     } catch (error) {
-        console.error('Ошибка при переключении камеря:', error);
+        console.error('Ошибка при переключении камеры:', error);
     }
 }
 
@@ -149,6 +148,7 @@ function updatePersistentNotifications() {
     }
 }
 
+// Функция для временных уведомлений (ОСТАЕТСЯ для уведомлений о соединении)
 function showTemporaryNotification(message, type) {
     const notifications = document.getElementById('statusNotifications');
     const notification = document.createElement('div');
@@ -239,9 +239,9 @@ function showReloadMessage() {
     `;
 }
 
-// Функция для обновления интерфейса без пересоздания (ИСПРАВЛЕННАЯ)
+// Функция для обновления интерфейса без пересоздания
 function updateInterface() {
-    // ТОЛЬКО обновляем состояние кнопок (главная проблема)
+    // ТОЛЬКО обновляем состояние кнопок
     const audioButton = document.getElementById('toggleAudioButton');
     const videoButton = document.getElementById('toggleVideoButton');
     
@@ -264,12 +264,9 @@ function updateInterface() {
     
     // Обновляем постоянные уведомления
     updatePersistentNotifications();
-    
-    // НЕ обновляем видео элементы если они уже установлены!
-    // Это вызывает мерцание
 }
 
-// Функция для полного восстановления интерфейса (ИСПРАВЛЕННАЯ)
+// Функция для полного восстановления интерфейса
 function restoreInterface() {
     if (document.querySelector('.video-container')) {
         return; // Интерфейс уже существует
@@ -359,7 +356,7 @@ function setupSocketEvents() {
         showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
     });
     
-    // ОБРАБОТЧИК СТАТУСОВ
+    // ОБРАБОТЧИК СТАТУСОВ (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
@@ -372,25 +369,8 @@ function setupSocketEvents() {
             remoteVideoOff = data.videoOff;
         }
         
-        // Обновляем постоянные уведомления
+        // Обновляем только постоянные уведомления (БЕЗ временных уведомлений)
         updatePersistentNotifications();
-        
-        // Показываем временные уведомления об изменении статуса
-        if (data.hasOwnProperty('audioMuted')) {
-            if (data.audioMuted) {
-                showTemporaryNotification('Собеседник отключил микрофон', 'audio-muted');
-            } else {
-                showTemporaryNotification('Собеседник включил микрофон', 'audio-muted');
-            }
-        }
-        
-        if (data.hasOwnProperty('videoOff')) {
-            if (data.videoOff) {
-                showTemporaryNotification('Собеседник отключил камеру', 'video-off');
-            } else {
-                showTemporaryNotification('Собеседник включил камеру', 'video-off');
-            }
-        }
     });
     
     socket.on('user-left', (data) => {
@@ -433,7 +413,7 @@ function createPeerConnection(targetUserId) {
         console.log('Состояние PeerConnection:', state);
         switch(state) {
             case 'connected':
-                showTemporaryNotification('Соединение установлено', 'connected');
+                showTemporaryNotification('Соединение установлено', 'connected'); // ОСТАЕТСЯ
                 reconnectAttempts = 0;
                 isReconnecting = false;
                 break;
@@ -513,7 +493,7 @@ async function createOffer(targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания offer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error'); // ОСТАЕТСЯ
     }
 }
 
@@ -541,7 +521,7 @@ async function createAnswer(offer, targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания answer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error'); // ОСТАЕТСЯ
     }
 }
 
@@ -554,6 +534,7 @@ async function setRemoteAnswer(answer) {
     }
 }
 
+// ФУНКЦИЯ toggleAudio (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
 async function toggleAudio() {
     if (isProcessingAudio) return;
     
@@ -576,12 +557,6 @@ async function toggleAudio() {
                 }, 150);
                 
                 sendStatusToPeer();
-                
-                if (isAudioMuted) {
-                    showTemporaryNotification('Вы отключили микрофон', 'audio-muted');
-                } else {
-                    showTemporaryNotification('Вы включили микрофон', 'audio-muted');
-                }
             }
         }
     } catch (error) {
@@ -593,6 +568,7 @@ async function toggleAudio() {
     }
 }
 
+// ФУНКЦИЯ toggleVideo (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
 async function toggleVideo() {
     if (isProcessingVideo) return;
     
@@ -615,12 +591,6 @@ async function toggleVideo() {
                 }, 150);
                 
                 sendStatusToPeer();
-                
-                if (isVideoOff) {
-                    showTemporaryNotification('Вы отключили камеру', 'video-off');
-                } else {
-                    showTemporaryNotification('Вы включили камеру', 'video-off');
-                }
             }
         }
     } catch (error) {
