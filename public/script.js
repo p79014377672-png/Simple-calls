@@ -12,6 +12,10 @@ let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 50;
 
+// Новые глобальные переменные для статуса собеседника
+let remoteAudioMuted = false;
+let remoteVideoOff = false;
+
 // Защита от множественных нажатий
 let isProcessingAudio = false;
 let isProcessingVideo = false;
@@ -102,7 +106,32 @@ async function switchCamera() {
     }
 }
 
-function showStatusNotification(message, type) {
+// Новая система уведомлений
+function updatePersistentNotifications() {
+    const container = document.getElementById('persistentNotifications');
+    if (!container) return;
+
+    // Очищаем контейнер
+    container.innerHTML = '';
+
+    // Создаем уведомление об аудио, если оно отключено у собеседника
+    if (remoteAudioMuted) {
+        const audioNotification = document.createElement('div');
+        audioNotification.className = 'persistent-notification audio-muted';
+        audioNotification.innerHTML = '🔇 Собеседник отключил микрофон';
+        container.appendChild(audioNotification);
+    }
+
+    // Создаем уведомление о видео, если оно отключено у собеседника
+    if (remoteVideoOff) {
+        const videoNotification = document.createElement('div');
+        videoNotification.className = 'persistent-notification video-off';
+        videoNotification.innerHTML = '📹 Собеседник отключил камеру';
+        container.appendChild(videoNotification);
+    }
+}
+
+function showTemporaryNotification(message, type) {
     const notifications = document.getElementById('statusNotifications');
     const notification = document.createElement('div');
     notification.className = `status-notification status-${type}`;
@@ -114,7 +143,7 @@ function showStatusNotification(message, type) {
         if (notification.parentNode) {
             notification.parentNode.removeChild(notification);
         }
-    }, 5000);
+    }, 3000);
 }
 
 function sendStatusToPeer() {
@@ -195,10 +224,14 @@ function restoreInterface() {
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
             <video id="localVideo" autoplay muted playsinline></video>
+            
+            <div id="persistentNotifications" class="persistent-notifications"></div>
+            
             <div class="controls">
                 <button id="toggleAudioButton" class="control-button">🎤</button>
                 <button id="toggleVideoButton" class="control-button">🎥</button>
             </div>
+            
             <div id="statusNotifications" class="status-notifications"></div>
         </div>
     `;
@@ -213,6 +246,13 @@ function restoreInterface() {
     document.getElementById('toggleAudioButton').onclick = toggleAudio;
     document.getElementById('toggleVideoButton').onclick = toggleVideo;
     document.getElementById('localVideo').onclick = switchCamera;
+    
+    // Восстанавливаем состояние кнопок
+    document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
+    document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
+    
+    // Восстанавливаем постоянные уведомления о статусе собеседника
+    updatePersistentNotifications();
 }
 
 function setupSocketEvents() {
@@ -244,42 +284,53 @@ function setupSocketEvents() {
             console.error('Ошибка добавления ICE candidate:', error);
         }
     });
-socket.on('room-full', () => {
-    console.error('Комната уже занята!');
-    showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
-});
     
-    // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СТАТУСОВ
+    // Обработчик для переполненной комнаты
+    socket.on('room-full', () => {
+        console.error('Комната уже занята!');
+        showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
+    });
+    
+    // НОВЫЙ ОБРАБОТЧИК СТАТУСОВ
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
-        // СИНХРОНИЗИРУЕМ локальное состояние с состоянием собеседника
+        // Сохраняем статус собеседника в глобальных переменных
         if (data.hasOwnProperty('audioMuted')) {
-            isAudioMuted = data.audioMuted;
-            document.getElementById('toggleAudioButton').textContent = isAudioMuted ? '🎤❌' : '🎤';
+            remoteAudioMuted = data.audioMuted;
         }
         
         if (data.hasOwnProperty('videoOff')) {
-            isVideoOff = data.videoOff;
-            document.getElementById('toggleVideoButton').textContent = isVideoOff ? '🎥❌' : '🎥';
+            remoteVideoOff = data.videoOff;
         }
         
-        // Показываем уведомления
-        if (data.audioMuted) {
-            showStatusNotification('Собеседник отключил микрофон', 'audio-muted');
-        } else if (data.hasOwnProperty('audioMuted')) {
-            showStatusNotification('Собеседник включил микрофон', 'audio-muted');
+        // Обновляем постоянные уведомления
+        updatePersistentNotifications();
+        
+        // Показываем временные уведомления об изменении статуса
+        if (data.hasOwnProperty('audioMuted')) {
+            if (data.audioMuted) {
+                showTemporaryNotification('Собеседник отключил микрофон', 'audio-muted');
+            } else {
+                showTemporaryNotification('Собеседник включил микрофон', 'audio-muted');
+            }
         }
         
-        if (data.videoOff) {
-            showStatusNotification('Собеседник отключил камеру', 'video-off');
-        } else if (data.hasOwnProperty('videoOff')) {
-            showStatusNotification('Собеседник включил камеру', 'video-off');
+        if (data.hasOwnProperty('videoOff')) {
+            if (data.videoOff) {
+                showTemporaryNotification('Собеседник отключил камеру', 'video-off');
+            } else {
+                showTemporaryNotification('Собеседник включил камеру', 'video-off');
+            }
         }
     });
     
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
+        // Сбрасываем статус собеседника при выходе
+        remoteAudioMuted = false;
+        remoteVideoOff = false;
+        updatePersistentNotifications();
         tryReconnect();
     });
     
@@ -296,7 +347,7 @@ socket.on('room-full', () => {
     });
 }
 
-// НОВАЯ ФУНКЦИЯ: Таймаут для операций WebRTC
+// Новая функция: Таймаут для операций WebRTC
 function waitWithTimeout(promise, timeoutMs, errorMessage) {
     return Promise.race([
         promise,
@@ -312,19 +363,15 @@ function createPeerConnection(targetUserId) {
     peerConnection.onconnectionstatechange = () => {
         const state = peerConnection.connectionState;
         console.log('Состояние PeerConnection:', state);
-        // БОЛЕЕ ДЕТАЛЬНАЯ ОБРАБОТКА КАЖДОГО СОСТОЯНИЯ
         switch(state) {
             case 'connected':
-                // Peers connected!
-                showStatusNotification('Соединение установлено', 'connected');
+                showTemporaryNotification('Соединение установлено', 'connected');
                 reconnectAttempts = 0;
                 isReconnecting = false;
                 break;
             case 'disconnected':
             case 'failed':
                 console.log('Соединение разорвано или не удалось...');
-                // Не пытаемся переподключаться сразу, ждем события от сервера о том, что пользователь вышел
-                // tryReconnect() вызывается из события 'user-left'
                 break;
             case 'closed':
                 console.log('Соединение полностью закрыто');
@@ -335,17 +382,14 @@ function createPeerConnection(targetUserId) {
     peerConnection.oniceconnectionstatechange = () => {
         const state = peerConnection.iceConnectionState;
         console.log('ICE состояние:', state);
-        // Логируем все состояния ICE для диагностики
         if (state === 'failed') {
             console.error('ICE Gathering завершилось ошибкой. Возможно, проблемы с сетью.');
-            // Здесь можно попробовать пересоздать offer/answer, но часто помогает только переподключение
         }
         if (state === 'disconnected') {
             console.log('ICE соединение разорвано (возможно, временные проблемы с сетью).');
         }
     };
 
-    // Логируем события ICE Gathering
     peerConnection.onicegatheringstatechange = () => {
         console.log('ICE Gathering состояние:', peerConnection.iceGatheringState);
     };
@@ -378,15 +422,14 @@ function createPeerConnection(targetUserId) {
 async function createOffer(targetUserId) {
     try {
         peerConnection = createPeerConnection(targetUserId);
-        // ДОБАВЛЯЕМ ТАЙМАУТ НА СОЗДАНИЕ OFFER
         const offer = await waitWithTimeout(
             peerConnection.createOffer(),
-            10000, // 10 секунд
+            10000,
             'Таймаут при создании offer'
         );
         await waitWithTimeout(
             peerConnection.setLocalDescription(offer),
-            5000, // 5 секунд
+            5000,
             'Таймаут при установке local description'
         );
         socket.emit('offer', {
@@ -395,8 +438,7 @@ async function createOffer(targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания offer:', error);
-        showStatusNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
-        // tryReconnect(); // Пока не вызываем, ждем событий от сервера
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
     }
 }
 
@@ -424,8 +466,7 @@ async function createAnswer(offer, targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания answer:', error);
-        showStatusNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
-        // tryReconnect();
+        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
     }
 }
 
@@ -462,9 +503,9 @@ async function toggleAudio() {
                 sendStatusToPeer();
                 
                 if (isAudioMuted) {
-                    showStatusNotification('Вы отключили микрофон', 'audio-muted');
+                    showTemporaryNotification('Вы отключили микрофон', 'audio-muted');
                 } else {
-                    showStatusNotification('Вы включили микрофон', 'audio-muted');
+                    showTemporaryNotification('Вы включили микрофон', 'audio-muted');
                 }
             }
         }
@@ -501,9 +542,9 @@ async function toggleVideo() {
                 sendStatusToPeer();
                 
                 if (isVideoOff) {
-                    showStatusNotification('Вы отключили камеру', 'video-off');
+                    showTemporaryNotification('Вы отключили камеру', 'video-off');
                 } else {
-                    showStatusNotification('Вы включили камеру', 'video-off');
+                    showTemporaryNotification('Вы включили камеру', 'video-off');
                 }
             }
         }
