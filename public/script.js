@@ -49,7 +49,7 @@ async function init() {
         setupSocketEvents();
         socket.emit('join-room', roomId);
         
-        // Правильная инициализация обработчиков после загрузки
+        // Правильная инициализация обработчиков после загрузка
         setTimeout(() => {
             const audioButton = document.getElementById('toggleAudioButton');
             const videoButton = document.getElementById('toggleVideoButton');
@@ -87,8 +87,8 @@ async function startLocalVideo() {
         videoTrack = localStream.getVideoTracks()[0];
         const localVideo = document.getElementById('localVideo');
         localVideo.srcObject = localStream;
-        // ПРИМЕНЯЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
-        localVideo.style.transform = 'scaleX(-1)';
+        // ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
+        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
         showError('Не удалось получить доступ к камере и микрофону');
@@ -114,8 +114,8 @@ async function switchCamera() {
         }
         const localVideo = document.getElementById('localVideo');
         localVideo.srcObject = localStream;
-        // ПРИМЕНЯЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
-        localVideo.style.transform = 'scaleX(-1)';
+        // ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
+        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
         if (peerConnection) {
             const sender = peerConnection.getSenders().find(s => 
                 s.track && s.track.kind === 'video'
@@ -298,8 +298,8 @@ function restoreInterface() {
     if (localStream) {
         const localVideo = document.getElementById('localVideo');
         localVideo.srcObject = localStream;
-        // ВОССТАНАВЛИВАЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ
-        localVideo.style.transform = 'scaleX(-1)';
+        // ВОССТАНАВЛИВАЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
+        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
     }
     if (remoteStream) {
         document.getElementById('remoteVideo').srcObject = remoteStream;
@@ -362,7 +362,7 @@ function setupSocketEvents() {
     // Обработчик для переполненной комнаты
     socket.on('room-full', () => {
         console.error('Комната уже занята!');
-        showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
+        showError('В этой комната уже есть два участника. Пожалуйста, создайте новую комнату.');
     });
     
     // ОБРАБОТЧИК СТАТУСОВ (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
