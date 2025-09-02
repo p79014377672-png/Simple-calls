@@ -1,5 +1,5 @@
 {
-  "name": "simple-video-chat",
+  "name": "simple-calls",
   "version": "1.0.0",
   "description": "Простая P2P видео-звонилка на WebRTC",
   "main": "server.js",
