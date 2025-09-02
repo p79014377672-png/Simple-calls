@@ -6,18 +6,19 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-// КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Явно указываем CORS политику
+// КРИТИЧЕСКИ ВАЖНО: Явная настройка CORS для Socket.io
 const io = socketIo(server, {
     cors: {
         origin: "*", // Разрешаем запросы с любого origin
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
-// Serve static files from the 'public' directory
+// Обслуживание статических файлов
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Handle all other routes by serving index.html
+// Все остальные маршруты → index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -46,7 +47,6 @@ io.on('connection', (socket) => {
     console.log('Пользователь подключился:', socket.id);
 
     socket.on('user-status', (data) => {
-        console.log(`Статус от ${socket.id}:`, data);
         if (socket.roomId) {
             socket.to(socket.roomId).emit('user-status', data);
         }
@@ -56,19 +56,16 @@ io.on('connection', (socket) => {
         console.log(`Пользователь ${socket.id} запросил комнату ${roomId}`);
         
         if (socket.roomId) {
-            console.log(`Пользователь ${socket.id} уже в комнате ${socket.roomId}. Выходим...`);
             leaveRoom(socket);
         }
 
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { users: [] });
-            console.log(`Комната ${roomId} создана`);
         }
 
         const room = rooms.get(roomId);
         
         if (room.users.length >= 2) {
-            console.log(`Комната ${roomId} переполнена. Отклоняем подключение ${socket.id}`);
             socket.emit('room-full');
             return;
         }
@@ -77,7 +74,6 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         room.users.push(socket.id);
         
-        console.log(`Пользователь ${socket.id} присоединился к комнате ${roomId}`);
         console.log(`В комнате ${roomId} теперь пользователей: ${room.users.length}`);
 
         if (room.users.length === 1) {
@@ -91,7 +87,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('offer', (data) => {
-        console.log(`Offer от ${socket.id} для ${data.targetUserId}`);
         socket.to(data.targetUserId).emit('offer', {
             offer: data.offer,
             from: socket.id
@@ -99,7 +94,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('answer', (data) => {
-        console.log(`Answer от ${socket.id} для ${data.targetUserId}`);
         socket.to(data.targetUserId).emit('answer', {
             answer: data.answer,
             from: socket.id
@@ -107,7 +101,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('ice-candidate', (data) => {
-        console.log(`ICE candidate от ${socket.id} для ${data.targetUserId}`);
         socket.to(data.targetUserId).emit('ice-candidate', {
             candidate: data.candidate,
             from: socket.id
@@ -120,8 +113,12 @@ io.on('connection', (socket) => {
     });
 });
 
-// КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Render теперь использует порт 10000
+// КРИТИЧЕСКИ ВАЖНО: Render теперь использует порт 10000
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+    
+    // Проверяем, какие порты действительно слушаются
+    const addresses = server.address();
+    console.log('Actual server address:', addresses);
 });
