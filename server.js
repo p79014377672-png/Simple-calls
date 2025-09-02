@@ -70,7 +70,7 @@ io.on('connection', (socket) => {
 
         const room = rooms.get(roomId);
         
-        // КРИТИЧЕСКИ ВАЖНО: Проверяем лимит (макс. 2 пользователя)
+        // Проверяем лимит (макс. 2 пользователя)
         if (room.users.length >= 2) {
             console.log(`Комната ${roomId} переполнена. Отклоняем подключение ${socket.id}`);
             socket.emit('room-full'); // Отправляем событие на клиент

@@ -20,15 +20,34 @@ let remoteVideoOff = false;
 let isProcessingAudio = false;
 let isProcessingVideo = false;
 
+// КОНФИГУРАЦИЯ С TURN-СЕРВЕРОМ METERED (ОБНОВЛЕННАЯ!)
 const configuration = {
     iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' },
-        { urls: 'stun:stun.voipbuster.com:3478' },
-        { urls: 'stun:stun.services.mozilla.com:3478' }
+        // STUN-сервер от Metered
+        {
+            urls: "stun:stun.relay.metered.ca:80",
+        },
+        // TURN-серверы от Metered на разных протоколах и портах
+        {
+            urls: "turn:global.relay.metered.ca:80",
+            username: "8080b533302c74fa69b0b1f3", // Ваш username
+            credential: "n8y56B5MSDlWyUnU", // Ваш password
+        },
+        {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: "8080b533302c74fa69b0b1f3",
+            credential: "n8y56B5MSDlWyUnU",
+        },
+        {
+            urls: "turn:global.relay.metered.ca:443",
+            username: "8080b533302c74fa69b0b1f3",
+            credential: "n8y56B5MSDlWyUnU",
+        },
+        {
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+            username: "8080b533302c74fa69b0b1f3",
+            credential: "n8y56B5MSDlWyUnU",
+        },
     ],
     iceCandidatePoolSize: 10,
     iceTransportPolicy: 'all'
@@ -360,7 +379,7 @@ function setupSocketEvents() {
     });
     
     // Обработчик для переполненной комнаты
-    socket.on('room-full', () => {
+    socket.on('room-full', () {
         console.error('Комната уже занята!');
         showError('В этой комната уже есть два участника. Пожалуйста, создайте новую комнату.');
     });
