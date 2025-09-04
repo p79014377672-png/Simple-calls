@@ -1,7 +1,7 @@
 {
   "name": "simple-video-chat",
   "version": "1.0.0",
-  "description": "Прощая P2P видео-звонилка на WebRTC",
+  "description": "Простая P2P видео-звонилка на WebRTC",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -17,13 +17,15 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
-    "express": "^5.1.0",
-    "socket.io": "^4.8.1"
+    "express": "4.18.3",
+    "socket.io": "4.7.5",
+    "debug": "4.3.4",
+    "iconv-lite": "0.6.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }

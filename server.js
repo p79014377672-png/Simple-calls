@@ -14,7 +14,7 @@ const io = socketIo(server, {
 
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 
-app.get('*', (req, res, next) => {
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
