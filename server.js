@@ -14,7 +14,8 @@ const io = socketIo(server, {
 
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 
-app.get('*', (req, res) => {
+// Для Express 5 нужно явно указать параметр
+app.get('*', (req, res, next) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
