@@ -10,7 +10,7 @@ let currentFacingMode = 'user';
 let videoTrack = null;
 let isReconnecting = false;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 50;
+const MAX_RECONNECT_ATTEMPTS = 3;
 
 // Новые глобальные переменные для статуса собеседника
 let remoteAudioMuted = false;
@@ -20,34 +20,30 @@ let remoteVideoOff = false;
 let isProcessingAudio = false;
 let isProcessingVideo = false;
 
-// КОНФИГУРАЦИЯ С TURN-СЕРВЕРОМ METERED (ОБНОВЛЕННАЯ!)
+// КОНФИГУРАЦИЯ С TURN-СЕРВЕРОМ METERED
 const configuration = {
     iceServers: [
-        // STUN-сервер от Metered
-        {
-            urls: "stun:stun.relay.metered.ca:80",
-        },
-        // TURN-серверы от Metered на разных протоколах и портах
-        {
+        { urls: "stun:stun.relay.metered.ca:80" },
+        { 
             urls: "turn:global.relay.metered.ca:80",
-            username: "8080b533302c74fa69b0b1f3", // Ваш username
-            credential: "n8y56B5MSDlWyUnU", // Ваш password
+            username: "8080b533302c74fa69b0b1f3",
+            credential: "n8y56B5MSDlWyUnU"
         },
         {
             urls: "turn:global.relay.metered.ca:80?transport=tcp",
             username: "8080b533302c74fa69b0b1f3",
-            credential: "n8y56B5MSDlWyUnU",
+            credential: "n8y56B5MSDlWyUnU"
         },
         {
             urls: "turn:global.relay.metered.ca:443",
             username: "8080b533302c74fa69b0b1f3",
-            credential: "n8y56B5MSDlWyUnU",
+            credential: "n8y56B5MSDlWyUnU"
         },
         {
             urls: "turns:global.relay.metered.ca:443?transport=tcp",
             username: "8080b533302c74fa69b0b1f3",
-            credential: "n8y56B5MSDlWyUnU",
-        },
+            credential: "n8y56B5MSDlWyUnU"
+        }
     ],
     iceCandidatePoolSize: 10,
     iceTransportPolicy: 'all'
@@ -55,8 +51,17 @@ const configuration = {
 
 async function init() {
     try {
+        console.log('Инициализация началась...');
+        
+        // Проверка поддержки медиаустройств
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Ваш браузер не поддерживает доступ к камере и микрофону');
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         roomId = urlParams.get('room') || generateRoomId();
+        
+        console.log('Комната:', roomId);
         
         if (!urlParams.has('room')) {
             const newUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
@@ -64,32 +69,21 @@ async function init() {
         }
         
         socket = io();
-        await startLocalVideo();
+        console.log('Socket создан');
+        
+        // Сначала получаем медиапоток
+        const mediaSuccess = await startLocalVideo();
+        if (!mediaSuccess) {
+            return; // Останавливаем если не удалось получить доступ к медиа
+        }
+        
         setupSocketEvents();
         socket.emit('join-room', roomId);
-        
-        // Правильная инициализация обработчиков после загрузка
-        setTimeout(() => {
-            const audioButton = document.getElementById('toggleAudioButton');
-            const videoButton = document.getElementById('toggleVideoButton');
-            const localVideo = document.getElementById('localVideo');
-            
-            if (audioButton) {
-                audioButton.onclick = toggleAudio;
-                audioButton._listenerAttached = true;
-            }
-            if (videoButton) {
-                videoButton.onclick = toggleVideo;
-                videoButton._listenerAttached = true;
-            }
-            if (localVideo) {
-                localVideo.onclick = switchCamera;
-            }
-        }, 1000);
+        console.log('Запрос на присоединение к комнате отправлен');
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
-        showError('Ошибка при запуске приложения');
+        showError('Ошибка при запуске: ' + error.message);
     }
 }
 
@@ -103,27 +97,44 @@ async function startLocalVideo() {
             video: { facingMode: 'user' },
             audio: true 
         });
+        
+        if (!localStream || localStream.getTracks().length === 0) {
+            throw new Error('Не удалось получить доступ к камере и микрофону');
+        }
+        
         videoTrack = localStream.getVideoTracks()[0];
         const localVideo = document.getElementById('localVideo');
-        localVideo.srcObject = localStream;
-        // ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
-        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            // ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
+            localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+        
+        console.log('Локальное видео запущено');
+        return true;
     } catch (error) {
         console.error('Ошибка доступа к камере/микрофону:', error);
-        showError('Не удалось получить доступ к камере и микрофону');
+        showError('Не удалось получить доступ к камере и микрофону. Разрешите доступ и обновите страницу.');
+        return false;
     }
 }
 
 async function switchCamera() {
+    if (isProcessingVideo) return;
+    
+    isProcessingVideo = true;
+    console.log('Переключение камеры...');
+    
     try {
-        console.log('Переключение камеры...');
         if (videoTrack) videoTrack.stop();
         const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
         currentFacingMode = newFacingMode;
+        
         const newStream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: newFacingMode },
             audio: true 
         });
+        
         const newVideoTrack = newStream.getVideoTracks()[0];
         if (localStream) {
             const oldVideoTrack = localStream.getVideoTracks()[0];
@@ -131,20 +142,29 @@ async function switchCamera() {
             localStream.addTrack(newVideoTrack);
             videoTrack = newVideoTrack;
         }
+        
         const localVideo = document.getElementById('localVideo');
-        localVideo.srcObject = localStream;
-        // ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
-        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+        
         if (peerConnection) {
             const sender = peerConnection.getSenders().find(s => 
                 s.track && s.track.kind === 'video'
             );
             if (sender) await sender.replaceTrack(newVideoTrack);
         }
+        
+        // Останавливаем аудио треки из нового потока (мы используем старые)
         newStream.getAudioTracks().forEach(track => track.stop());
+        
         console.log('Камера переключена на:', newFacingMode);
     } catch (error) {
         console.error('Ошибка при переключении камеры:', error);
+        showMobileAlert('Ошибка переключения камеры');
+    } finally {
+        isProcessingVideo = false;
     }
 }
 
@@ -153,10 +173,8 @@ function updatePersistentNotifications() {
     const container = document.getElementById('persistentNotifications');
     if (!container) return;
 
-    // Очищаем контейнер
     container.innerHTML = '';
 
-    // Создаем уведомление об аудио, если оно отключено у собеседника
     if (remoteAudioMuted) {
         const audioNotification = document.createElement('div');
         audioNotification.className = 'persistent-notification audio-muted';
@@ -164,7 +182,6 @@ function updatePersistentNotifications() {
         container.appendChild(audioNotification);
     }
 
-    // Создаем уведомление о видео, если оно отключено у собеседника
     if (remoteVideoOff) {
         const videoNotification = document.createElement('div');
         videoNotification.className = 'persistent-notification video-off';
@@ -173,9 +190,11 @@ function updatePersistentNotifications() {
     }
 }
 
-// Функция для временных уведомлений (для уведомлений о соединении)
+// Функция для временных уведомлений
 function showTemporaryNotification(message, type) {
     const notifications = document.getElementById('statusNotifications');
+    if (!notifications) return;
+    
     const notification = document.createElement('div');
     notification.className = `status-notification status-${type}`;
     notification.textContent = message;
@@ -189,20 +208,23 @@ function showTemporaryNotification(message, type) {
     }, 3000);
 }
 
+// Мобильные уведомления
+function showMobileAlert(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.style = 'position:fixed; top:10px; left:10px; right:10px; background:rgba(0,0,0,0.8); color:white; padding:10px; z-index:1000; text-align:center; border-radius:5px;';
+    alertDiv.textContent = message;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => {
+        if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv);
+    }, 3000);
+}
+
 function sendStatusToPeer() {
     if (socket && roomId) {
         socket.emit('user-status', {
             audioMuted: isAudioMuted,
             videoOff: isVideoOff
         });
-    }
-}
-
-function checkAndRestoreInterface() {
-    // Эта функция теперь нужна только для крайних случаев
-    if (document.querySelector('.video-container') === null) {
-        console.log('Полное восстановление интерфейса...');
-        restoreInterface();
     }
 }
 
@@ -213,13 +235,10 @@ function tryReconnect() {
     reconnectAttempts++;
     
     console.log(`Попытка переподключения #${reconnectAttempts}`);
-    showReconnectingMessage();
+    showMobileAlert('Переподключение...');
     
-    if (reconnectAttempts >= 2) {
-        console.log('Автоматическая перезагрузка после 2 попыток...');
-        setTimeout(() => {
-            window.location.reload(true);
-        }, 1000);
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        showReloadMessage();
         return;
     }
     
@@ -232,22 +251,6 @@ function tryReconnect() {
     }, 2000);
 }
 
-function showReconnectingMessage() {
-    document.body.innerHTML = `
-        <div style="width:100%; height:100%; background-color:black; color:white; 
-                   display:flex; flex-direction:column; justify-content:center; align-items:center; 
-                   font-family:sans-serif; text-align:center; padding:20px;">
-            <div>
-                <h2>Связь прервалась</h2>
-                <p>Пытаюсь восстановить соединение...</p>
-                <button onclick="window.location.reload(true)" class="reload-button">
-                    Обновить
-                </button>
-            </div>
-        </div>
-    `;
-}
-
 function showReloadMessage() {
     document.body.innerHTML = `
         <div style="width:100%; height:100%; background-color:black; color:white; 
@@ -256,7 +259,7 @@ function showReloadMessage() {
             <div>
                 <h2>Не удалось восстановить связь</h2>
                 <p>Попробуйте перезагрузить страницу</p>
-                <button onclick="window.location.reload(true)" class="reload-button">
+                <button onclick="hardReload()" class="reload-button">
                     Обновить
                 </button>
             </div>
@@ -264,15 +267,12 @@ function showReloadMessage() {
     `;
 }
 
-// Функция для обновления интерфейса без пересоздания
 function updateInterface() {
-    // ТОЛЬКО обновляем состояние кнопок
     const audioButton = document.getElementById('toggleAudioButton');
     const videoButton = document.getElementById('toggleVideoButton');
     
     if (audioButton) {
         audioButton.textContent = isAudioMuted ? '🎤❌' : '🎤';
-        // Важно: не перепривязываем обработчики, если они уже есть
         if (!audioButton._listenerAttached) {
             audioButton.onclick = toggleAudio;
             audioButton._listenerAttached = true;
@@ -287,74 +287,18 @@ function updateInterface() {
         }
     }
     
-    // Обновляем постоянные уведомления
-    updatePersistentNotifications();
-}
-
-// Функция для полного восстановления интерфейса
-function restoreInterface() {
-    if (document.querySelector('.video-container')) {
-        return; // Интерфейс уже существует
-    }
-    
-    document.body.innerHTML = `
-        <div class="video-container">
-            <video id="remoteVideo" autoplay playsinline></video>
-            <video id="localVideo" autoplay muted playsinline></video>
-            
-            <div id="persistentNotifications" class="persistent-notifications"></div>
-            
-            <div class="controls">
-                <button id="toggleAudioButton" class="control-button">🎤</button>
-                <button id="toggleVideoButton" class="control-button">🎥</button>
-            </div>
-            
-            <div id="statusNotifications" class="status-notifications"></div>
-        </div>
-    `;
-    
-    // Восстанавливаем видео потоки
-    if (localStream) {
-        const localVideo = document.getElementById('localVideo');
-        localVideo.srcObject = localStream;
-        // ВОССТАНАВЛИВАЕМ ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ФРОНТАЛЬНОЙ КАМЕРЫ
-        localVideo.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-    }
-    if (remoteStream) {
-        document.getElementById('remoteVideo').srcObject = remoteStream;
-    }
-    
-    // Привязываем обработчики и помечаем их как привязанные
-    const audioButton = document.getElementById('toggleAudioButton');
-    const videoButton = document.getElementById('toggleVideoButton');
-    const localVideo = document.getElementById('localVideo');
-    
-    if (audioButton) {
-        audioButton.onclick = toggleAudio;
-        audioButton._listenerAttached = true;
-        audioButton.textContent = isAudioMuted ? '🎤❌' : '🎤';
-    }
-    
-    if (videoButton) {
-        videoButton.onclick = toggleVideo;
-        videoButton._listenerAttached = true;
-        videoButton.textContent = isVideoOff ? '🎥❌' : '🎥';
-    }
-    
-    if (localVideo) {
-        localVideo.onclick = switchCamera;
-    }
-    
     updatePersistentNotifications();
 }
 
 function setupSocketEvents() {
     socket.on('you-are-the-first', () => {
         console.log('Вы первый в комнате. Ожидаем второго участника...');
+        showMobileAlert('Ожидаем второго участника...');
     });
     
     socket.on('user-joined', async (data) => {
         console.log('Новый пользователь присоединился:', data.newUserId);
+        showMobileAlert('Собеседник подключился!');
         reconnectAttempts = 0;
         await createOffer(data.newUserId);
     });
@@ -378,32 +322,28 @@ function setupSocketEvents() {
         }
     });
     
-    // Обработчик для переполненной комнаты
-    socket.on('room-full', () {
+    socket.on('room-full', () => {
         console.error('Комната уже занята!');
-        showError('В этой комната уже есть два участника. Пожалуйста, создайте новую комнату.');
+        showError('В этой комнате уже есть два участника. Пожалуйста, создайте новую комнату.');
     });
     
-    // ОБРАБОТЧИК СТАТУСОВ (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
     socket.on('user-status', (data) => {
         console.log('Получен статус от собеседника:', data);
         
-        // Сохраняем статус собеседника в глобальных переменных
-        if (data.hasOwnProperty('audioMuted')) {
-            remoteAudioMuted = data.audioMuted;
+        if (data && typeof data === 'object') {
+            if (typeof data.audioMuted === 'boolean') {
+                remoteAudioMuted = data.audioMuted;
+            }
+            if (typeof data.videoOff === 'boolean') {
+                remoteVideoOff = data.videoOff;
+            }
+            updatePersistentNotifications();
         }
-        
-        if (data.hasOwnProperty('videoOff')) {
-            remoteVideoOff = data.videoOff;
-        }
-        
-        // Обновляем только постоянные уведомления (БЕЗ временных уведомлений)
-        updatePersistentNotifications();
     });
     
     socket.on('user-left', (data) => {
         console.log('Пользователь вышел:', data.userId);
-        // Сбрасываем статус собеседника при выходе
+        showMobileAlert('Собеседник отключился');
         remoteAudioMuted = false;
         remoteVideoOff = false;
         updatePersistentNotifications();
@@ -412,18 +352,19 @@ function setupSocketEvents() {
     
     socket.on('disconnect', () => {
         console.log('Соединение с сервером разорвано');
+        showMobileAlert('Соединение потеряно');
         tryReconnect();
     });
     
     socket.on('connect', () => {
         console.log('Соединение с сервером восстановлено');
+        showMobileAlert('Соединение восстановлено');
         if (roomId) {
             socket.emit('join-room', roomId);
         }
     });
 }
 
-// Функция: Таймаут для операций WebRTC
 function waitWithTimeout(promise, timeoutMs, errorMessage) {
     return Promise.race([
         promise,
@@ -442,12 +383,14 @@ function createPeerConnection(targetUserId) {
         switch(state) {
             case 'connected':
                 showTemporaryNotification('Соединение установлено', 'connected');
+                showMobileAlert('Соединение установлено!');
                 reconnectAttempts = 0;
                 isReconnecting = false;
                 break;
             case 'disconnected':
             case 'failed':
                 console.log('Соединение разорвано или не удалось...');
+                showMobileAlert('Потеря соединения');
                 break;
             case 'closed':
                 console.log('Соединение полностью закрыто');
@@ -459,15 +402,8 @@ function createPeerConnection(targetUserId) {
         const state = peerConnection.iceConnectionState;
         console.log('ICE состояние:', state);
         if (state === 'failed') {
-            console.error('ICE Gathering завершилось ошибкой. Возможно, проблемы с сетью.');
+            showMobileAlert('Ошибка соединения');
         }
-        if (state === 'disconnected') {
-            console.log('ICE соединение разорвано (возможно, временные проблемы с сетью).');
-        }
-    };
-
-    peerConnection.onicegatheringstatechange = () => {
-        console.log('ICE Gathering состояние:', peerConnection.iceGatheringState);
     };
 
     localStream.getTracks().forEach(track => {
@@ -478,15 +414,13 @@ function createPeerConnection(targetUserId) {
         console.log('Получен удаленный поток');
         remoteStream = event.streams[0];
         
-        // Устанавливаем видео поток ТОЛЬКО если элемент существует и поток еще не установлен
         const remoteVideo = document.getElementById('remoteVideo');
-        if (remoteVideo && !remoteVideo.srcObject) {
+        if (remoteVideo) {
             remoteVideo.srcObject = remoteStream;
         }
         
         reconnectAttempts = 0;
-        
-        // Просто обновляем интерфейс (кнопки, уведомления)
+        showMobileAlert('Видео соединение установлено!');
         updateInterface();
     };
 
@@ -521,7 +455,7 @@ async function createOffer(targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания offer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        showMobileAlert('Ошибка соединения');
     }
 }
 
@@ -549,7 +483,7 @@ async function createAnswer(offer, targetUserId) {
         });
     } catch (error) {
         console.error('Ошибка создания answer:', error);
-        showTemporaryNotification('Ошибка соединения. Попробуйте обновить страницу.', 'error');
+        showMobileAlert('Ошибка соединения');
     }
 }
 
@@ -562,7 +496,6 @@ async function setRemoteAnswer(answer) {
     }
 }
 
-// ФУНКЦИЯ toggleAudio (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
 async function toggleAudio() {
     if (isProcessingAudio) return;
     
@@ -577,14 +510,16 @@ async function toggleAudio() {
                 audioTracks[0].enabled = !isAudioMuted;
                 
                 const button = document.getElementById('toggleAudioButton');
-                button.textContent = isAudioMuted ? '🎤❌' : '🎤';
-                
-                button.style.transform = 'scale(0.9)';
-                setTimeout(() => {
-                    button.style.transform = 'scale(1)';
-                }, 150);
+                if (button) {
+                    button.textContent = isAudioMuted ? '🎤❌' : '🎤';
+                    button.style.transform = 'scale(0.9)';
+                    setTimeout(() => {
+                        button.style.transform = 'scale(1)';
+                    }, 150);
+                }
                 
                 sendStatusToPeer();
+                showMobileAlert(isAudioMuted ? 'Микрофон выключен' : 'Микрофон включен');
             }
         }
     } catch (error) {
@@ -596,7 +531,6 @@ async function toggleAudio() {
     }
 }
 
-// ФУНКЦИЯ toggleVideo (БЕЗ ВРЕМЕННЫХ УВЕДОМЛЕНИЙ)
 async function toggleVideo() {
     if (isProcessingVideo) return;
     
@@ -611,14 +545,16 @@ async function toggleVideo() {
                 videoTracks[0].enabled = !isVideoOff;
                 
                 const button = document.getElementById('toggleVideoButton');
-                button.textContent = isVideoOff ? '🎥❌' : '🎥';
-                
-                button.style.transform = 'scale(0.9)';
-                setTimeout(() => {
-                    button.style.transform = 'scale(1)';
-                }, 150);
+                if (button) {
+                    button.textContent = isVideoOff ? '🎥❌' : '🎥';
+                    button.style.transform = 'scale(0.9)';
+                    setTimeout(() => {
+                        button.style.transform = 'scale(1)';
+                    }, 150);
+                }
                 
                 sendStatusToPeer();
+                showMobileAlert(isVideoOff ? 'Камера выключена' : 'Камера включена');
             }
         }
     } catch (error) {
@@ -631,19 +567,38 @@ async function toggleVideo() {
 }
 
 function showError(message) {
+    if (document.querySelector('.error-container')) return;
+    
     document.body.innerHTML = `
-        <div style="width:100%; height:100%; background-color:black; color:white; 
+        <div class="error-container" style="width:100%; height:100%; background-color:black; color:white; 
                    display:flex; justify-content:center; align-items:center; 
                    font-family:sans-serif; text-align:center; padding:20px;">
             <div>
                 <h2>Ошибка</h2>
                 <p>${message}</p>
-                <button onclick="window.location.reload(true)" class="reload-button">
+                <button onclick="hardReload()" class="reload-button">
                     Обновить
                 </button>
             </div>
         </div>
     `;
+}
+
+function hardReload() {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = window.location.origin + window.location.pathname;
+}
+
+// Мобильная консоль для отладки
+function showMobileAlert(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.style = 'position:fixed; top:10px; left:10px; right:10px; background:rgba(0,0,0,0.8); color:white; padding:10px; z-index:1000; text-align:center; border-radius:5px; font-size:14px;';
+    alertDiv.textContent = message;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => {
+        if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv);
+    }, 3000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
