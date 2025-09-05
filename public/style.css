@@ -1,155 +1,39 @@
-html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    font-family: sans-serif;
-    background-color: #000;
-    color: white;
-    overflow: hidden;
-}
+html,body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; background-color: #000; color: white; overflow: hidden; }
 
-.video-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #000;
-}
+.video-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; }
 
-#remoteVideo {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
+#remoteVideo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 
-#localVideo {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    width: 20vw;
-    max-width: 180px;
-    height: 15vh;
-    max-height: 150px;
-    border: 2px solid white;
-    border-radius: 10px;
-    z-index: 10;
-    /* ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ЛОКАЛЬНОГО ПРОСМОТРА */
-    transform: scaleX(-1);
-    object-fit: cover;
-    cursor: pointer;
-}
+#localVideo { position: absolute; top: 20px; left: 20px; width: 20vw; max-width: 180px; height: 15vh; max-height: 150px; border: 2px solid white; border-radius: 10px; z-index: 10; /* ЗЕРКАЛЬНОЕ ОТОБРАЖЕНИЕ ТОЛЬКО ДЛЯ ЛОКАЛЬНОГО ПРОСМОТРА */ transform: scaleX(-1); object-fit: cover; cursor: pointer; }
 
-.controls {
-    position: absolute;
-    top: 20px;
-    left: calc(20px + 20vw + 10px);
-    max-left: calc(20px + 180px + 10px);
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-    z-index: 20;
-}
+.controls { position: absolute; top: 20px; left: calc(20px + 20vw + 10px); max-left: calc(20px + 180px + 10px); display: flex; flex-direction: row; gap: 10px; z-index: 20; }
 
-.control-button {
-    width: 44px;
-    height: 44px;
-    border: none;
-    border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    font-size: 1.2em;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    backdrop-filter: blur(5px);
-}
+.control-button { width: 44px; height: 44px; border: none; border-radius: 50%; background-color: rgba(255, 255, 255, 0.2); color: white; font-size: 1.2em; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
 
-.control-button:active {
-    transform: scale(0.95);
-}
+.control-button:active { transform: scale(0.95); }
 
-.status-notifications {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 30;
-    text-align: center;
-}
+.status-notifications { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 30; text-align: center; }
 
-.status-notification {
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 20px;
-    margin: 5px 0;
-    font-size: 14px;
-    backdrop-filter: blur(5px);
-}
+.status-notification { background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px 20px; border-radius: 20px; margin: 5px 0; font-size: 14px; backdrop-filter: blur(5px); }
 
-.status-audio-muted {
-    border-left: 4px solid #f44336;
-}
+.status-audio-muted { border-left: 4px solid #f44336; }
 
-.status-video-off {
-    border-left: 4px solid #ff9800;
-}
+.status-video-off { border-left: 4px solid #ff9800; }
 
-/* Стили для постоянных уведомлений о статусе собеседника (ПЕРЕМЕЩЕНЫ ВНИЗ СПРАВА) */
-.persistent-notifications {
-    position: absolute;
-    bottom: 70px;
-    right: 20px;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
+.status-connected { border-left: 4px solid #4CAF50; }
 
-.persistent-notification {
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 8px 15px;
-    border-radius: 15px;
-    margin: 5px 0;
-    font-size: 14px;
-    backdrop-filter: blur(5px);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+/* Стили для постоянных уведомлений о статусе собеседника (ПЕРЕМЕЩЕНЫ ВНИЗ СПРАВА) */ .persistent-notifications{ position: absolute; bottom: 70px; right: 20px; z-index: 30; display: flex; flex-direction: column; align-items: flex-end; }
 
-.persistent-notification.audio-muted {
-    border-left: 4px solid #f44336;
-}
+.persistent-notification { background-color: rgba(0, 0, 0, 0.7); color: white; padding: 8px 15px; border-radius: 15px; margin: 5px 0; font-size: 14px; backdrop-filter: blur(5px); display: flex; align-items: center; gap: 8px; }
 
-.persistent-notification.video-off {
-    border-left: 4px solid #ff9800;
-}
+.persistent-notification.audio-muted { border-left: 4px solid #f44336; }
 
-.persistent-notification.hidden {
-    display: none;
-}
+.persistent-notification.video-off { border-left: 4px solid #ff9800; }
 
-/* Стили для кнопки обновления */
-.reload-button {
-    padding: 12px 24px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    margin-top: 20px;
-    transition: background-color 0.3s;
-}
+.persistent-notification.hidden { display: none; }
 
-.reload-button:hover {
-    background-color: #45a049;
-}
+/* Стили для кнопки обновления */ .reload-button{ padding: 12px 24px; background-color: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-top: 20px; transition: background-color 0.3s; }
+
+.reload-button:hover { background-color: #45a049; }
+
+/* Стили для мобильных уведомлений (ПЕРЕМЕЩЕНЫ ВНИЗ) */ .mobile-alert{ position: fixed; bottom: 100px; left: 10px; right: 10px; background: rgba(0, 0, 0, 0.8); color: white; padding: 12px; z-index: 1000; text-align: center; border-radius: 8px; font-size: 14px; }
